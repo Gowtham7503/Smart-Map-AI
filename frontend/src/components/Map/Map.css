@@ -1,0 +1,280 @@
+/* Layout */
+.map-container {
+  display: flex;
+  height: 100vh;
+  font-family: "Segoe UI", sans-serif;
+  overflow: hidden;
+}
+
+/* Sidebar (RESIZABLE) */
+.sidebar {
+  background: #ffffff;
+  padding: 20px;
+  border-right: 1px solid #eee;
+  overflow-y: auto;
+  min-width: 220px;
+  max-width: 500px;
+  z-index: 10;
+}
+
+/* 🔥 LOGO */
+.logo h2 {
+  margin: 0;
+}
+
+.logo span {
+  color: green;
+}
+
+.logo p {
+  font-size: 12px;
+  color: gray;
+}
+
+/* 🔥 ROUTE BOX */
+.route-box {
+  margin-top: 20px;
+}
+
+.input {
+  margin-bottom: 10px;
+}
+
+.input label {
+  font-size: 12px;
+  color: gray;
+}
+
+.input input {
+  width: 100%;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  margin-top: 4px;
+}
+
+.directions-btn {
+  width: 100%;
+  padding: 12px;
+  background: green;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  margin-top: 10px;
+}
+
+/* 🔥 FILTERS */
+.filters {
+  margin-top: 20px;
+}
+
+.filters h4 {
+  margin-bottom: 10px;
+}
+
+.filter {
+  padding: 10px;
+  margin-top: 8px;
+  background: #f5f5f5;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.filter:hover {
+  background: #eaeaea;
+}
+
+.filter.active {
+  background: #d4f5d4;
+  color: green;
+}
+
+/* 🔥 PLACES */
+.places {
+  margin-top: 20px;
+}
+
+.places h4 {
+  margin-bottom: 10px;
+}
+
+.icons {
+  display: flex;
+  gap: 10px;
+}
+
+.icons div {
+  font-size: 20px;
+  background: #eee;
+  padding: 10px;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.icons div:hover {
+  background: #ddd;
+}
+
+/* 🔥 RESIZE HANDLE (Sidebar) */
+.resize-handle {
+  width: 6px;
+  cursor: col-resize;
+  background: transparent;
+  z-index: 20;
+  position: relative;
+}
+
+.resize-handle:hover {
+  background: #ddd;
+}
+
+/* Optional divider */
+.resize-handle::after {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 0;
+  width: 2px;
+  height: 100%;
+  background: #ccc;
+}
+
+/* Map area */
+.map-area {
+  flex: 1;
+  position: relative;
+}
+
+/* Map */
+.leaflet-map {
+  height: 100%;
+  width: 100%;
+}
+
+/* Search bar */
+.search-bar {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+}
+
+.search-bar input {
+  width: 400px;
+  padding: 12px;
+  border-radius: 25px;
+  border: none;
+  outline: none;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+}
+
+/* 🔥 UPDATED BOTTOM PANEL (RESIZABLE) */
+.bottom-panel {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  background: white;
+  border-radius: 20px 20px 0 0;
+  z-index: 1000;
+
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* 🔥 PANEL RESIZE HANDLE */
+.panel-resize-handle {
+  height: 8px;
+  cursor: row-resize;
+  background: transparent;
+  position: relative;
+}
+
+.panel-resize-handle:hover {
+  background: #eee;
+}
+
+/* Drag indicator */
+.panel-resize-handle::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 40px;
+  height: 4px;
+  background: #ccc;
+  border-radius: 10px;
+}
+
+/* 🔥 PANEL CONTENT (SCROLLABLE) */
+.bottom-panel-content {
+  padding: 15px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* Cards */
+.cards {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.card {
+  flex: 1;
+  padding: 10px;
+  border-radius: 12px;
+  background: #f3f3f3;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.card:hover {
+  transform: scale(1.03);
+}
+
+.card.active {
+  border: 2px solid green;
+}
+
+.card h4 {
+  margin: 0;
+}
+
+.card p {
+  font-weight: bold;
+}
+
+.card span {
+  font-size: 12px;
+  color: gray;
+}
+
+/* Buttons */
+.bottom-actions {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 15px;
+}
+
+.filter-btn {
+  padding: 10px 20px;
+  border-radius: 10px;
+  border: none;
+  background: #eee;
+  cursor: pointer;
+}
+
+.start-btn {
+  padding: 10px 20px;
+  border-radius: 10px;
+  border: none;
+  background: green;
+  color: white;
+  cursor: pointer;
+}
