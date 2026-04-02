@@ -1,6 +1,21 @@
 import { useMap } from "react-leaflet";
 import { useEffect } from "react";
+import React, { useState } from "react";
+import "./Map.css";
+import polyline from "polyline";
+import axios from "axios";
+import {
+  MapContainer,
+  TileLayer,
+  Marker,
+  Polyline,
+  Popup,
+} from "react-leaflet";
+import L from "leaflet";
+import { getRoute } from "../../services/api";
+import "leaflet/dist/leaflet.css";
 
+// ✅ Enable scroll zoom
 const EnableZoom = () => {
   const map = useMap();
 
@@ -10,19 +25,8 @@ const EnableZoom = () => {
 
   return null;
 };
-import React, { useState } from "react";
-import "./Map.css";
-import {
-  MapContainer,
-  TileLayer,
-  Marker,
-  Polyline,
-  Popup,
-} from "react-leaflet";
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
 
-// Marker fix (Vite)
+// ✅ Marker fix
 import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
@@ -35,14 +39,9 @@ L.Icon.Default.mergeOptions({
   shadowUrl: markerShadow,
 });
 
-const position = [17.4948, 78.3996];
-
-const routeCoords = [
-  [17.4948, 78.3996],
-  [17.48, 78.41],
-  [17.46, 78.42],
-  [17.44, 78.43],
-];
+// 🌍 Default positions
+const defaultStart = [17.4948, 78.3996];
+const defaultEnd = [17.4435, 78.3772];
 
 const MapView = () => {
   const [sidebarWidth, setSidebarWidth] = useState(320);
@@ -52,13 +51,69 @@ const MapView = () => {
   const [dragPanel, setDragPanel] = useState(false);
 
   const [selectedRoute, setSelectedRoute] = useState(0);
+  const [routeCoords, setRouteCoords] = useState([]);
+
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+
+  const [startPosition, setStartPosition] = useState(defaultStart);
+  const [endPosition, setEndPosition] = useState(defaultEnd);
 
   const routes = [
-    { type: "Fastest", time: "32 min", status: "Heavy Traffic", color: "orange" },
-    { type: "Safest", time: "36 min", status: "Secure Roads", color: "green" },
-    { type: "Eco", time: "40 min", status: "Low Emissions", color: "blue" },
+    { type: "Fastest", color: "#2ecc71" },
+    { type: "Safest", color: "#27ae60" },
+    { type: "Eco", color: "#00b894" },
   ];
 
+  // 🔍 Convert place → coordinates
+  const getCoordinates = async (place) => {
+    const res = await axios.get(
+      `https://nominatim.openstreetmap.org/search?format=json&q=${place}`
+    );
+
+    return [
+      parseFloat(res.data[0].lat),
+      parseFloat(res.data[0].lon),
+    ];
+  };
+
+  // 🚀 Fetch route
+  const fetchRoute = async () => {
+    try {
+      if (!from || !to) {
+        alert("Please enter both locations");
+        return;
+      }
+
+      const start = await getCoordinates(from);
+      const end = await getCoordinates(to);
+
+      setStartPosition(start);
+      setEndPosition(end);
+
+      const response = await getRoute([
+        [start[1], start[0]],
+        [end[1], end[0]],
+      ]);
+
+      if (!response.data || !response.data.routes) {
+        console.error("Invalid response:", response.data);
+        return;
+      }
+
+      const encoded = response.data.routes[0].geometry;
+      const decoded = polyline.decode(encoded);
+
+      const formatted = decoded.map(([lat, lng]) => [lat, lng]);
+
+      setRouteCoords(formatted);
+
+    } catch (error) {
+      console.error("Routing error:", error);
+    }
+  };
+
+  // 🖱 Resize handling
   const handleMouseMove = (e) => {
     if (dragSidebar) {
       const width = e.clientX;
@@ -87,37 +142,51 @@ const MapView = () => {
           <p>Safe • Smart • Sustainable</p>
         </div>
 
-        <div className="route-box">
+        {/* ✅ FIXED FORM */}
+        <form
+          className="route-box"
+          onSubmit={(e) => {
+            e.preventDefault();
+            fetchRoute();
+          }}
+        >
           <div className="input">
             <label>From</label>
-            <input value="My Location" readOnly />
+            <input
+              value={from}
+              onChange={(e) => setFrom(e.target.value)}
+              placeholder="Enter starting location"
+            />
           </div>
+
           <div className="input">
             <label>To</label>
-            <input value="Kukatpally, Hyderabad" readOnly />
+            <input
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+              placeholder="Enter destination"
+            />
           </div>
-          <button className="directions-btn">Get Directions</button>
-        </div>
 
-        <div className="filters">
-          <h4>Quick Filters</h4>
-          <div className="filter active">Safest Route</div>
-          <div className="filter">Low Pollution</div>
-          <div className="filter">Avoid Traffic</div>
-        </div>
+          <button type="submit" className="directions-btn">
+            Get Directions
+          </button>
+        </form>
 
-        <div className="places">
-          <h4>Nearby Places</h4>
-          <div className="icons">
-            <div>🍴</div>
-            <div>⛽</div>
-            <div>🏥</div>
-            <div>☕</div>
-          </div>
+        {/* AI SECTION */}
+        <div className="ai-section">
+          <h4>Smart AI Assistant</h4>
+
+          <button
+            className="ai-btn"
+            onClick={() => alert("AI Suggestions Coming Soon 🚀")}
+          >
+            🤖 Ask SmartMaps AI
+          </button>
         </div>
       </div>
 
-      {/* Sidebar Resize */}
+      {/* Resize Handle */}
       <div
         className="resize-handle"
         onMouseDown={() => setDragSidebar(true)}
@@ -125,45 +194,47 @@ const MapView = () => {
 
       {/* MAP */}
       <div className="map-area">
-        <div className="search-bar">
-          <input placeholder="Search location, place..." />
-        </div>
-
         <MapContainer
-            center={position}
-            zoom={12}
-            zoomControl={false}
-            scrollWheelZoom={true}
-            doubleClickZoom={true}
-            touchZoom={true}
-            dragging={true}
-            className="leaflet-map"
-          >
-          <EnableZoom />   {/* ✅ ADD THIS */}
+          center={startPosition}
+          zoom={12}
+          zoomControl={false}
+          className="leaflet-map"
+        >
+          <EnableZoom />
 
           <TileLayer
             attribution="&copy; OpenStreetMap"
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
 
-          <Marker position={position}>
+          <Marker position={startPosition}>
             <Popup>Start</Popup>
           </Marker>
 
-          <Marker position={routeCoords[routeCoords.length - 1]}>
+          <Marker position={endPosition}>
             <Popup>Destination</Popup>
           </Marker>
 
-          <Polyline
-            positions={routeCoords}
-            color={routes[selectedRoute].color}
-            weight={5}
-          />
+          {/* ✅ GREEN ROUTE */}
+          {routeCoords.length > 0 && (
+            <>
+              <Polyline
+                positions={routeCoords}
+                color="#2ecc71"
+                weight={10}
+                opacity={0.2}
+              />
+              <Polyline
+                positions={routeCoords}
+                color={routes[selectedRoute].color}
+                weight={6}
+              />
+            </>
+          )}
         </MapContainer>
 
         {/* BOTTOM PANEL */}
         <div className="bottom-panel" style={{ height: panelHeight }}>
-          
           <div
             className="panel-resize-handle"
             onMouseDown={() => setDragPanel(true)}
@@ -180,8 +251,6 @@ const MapView = () => {
                   onClick={() => setSelectedRoute(i)}
                 >
                   <h4>{r.type}</h4>
-                  <p>{r.time}</p>
-                  <span>{r.status}</span>
                 </div>
               ))}
             </div>

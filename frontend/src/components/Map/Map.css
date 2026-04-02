@@ -4,6 +4,7 @@
   height: 100vh;
   font-family: "Segoe UI", sans-serif;
   overflow: hidden;
+  background: #f8f9fa;
 }
 
 /* Sidebar (RESIZABLE) */
@@ -15,15 +16,18 @@
   min-width: 220px;
   max-width: 500px;
   z-index: 10;
+  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05);
+  transition: 0.3s;
 }
 
-/* 🔥 LOGO */
+/* LOGO */
 .logo h2 {
   margin: 0;
+  font-weight: 700;
 }
 
 .logo span {
-  color: green;
+  color: #2ecc71;
 }
 
 .logo p {
@@ -31,13 +35,13 @@
   color: gray;
 }
 
-/* 🔥 ROUTE BOX */
+/* ROUTE BOX */
 .route-box {
   margin-top: 20px;
 }
 
 .input {
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 
 .input label {
@@ -47,78 +51,66 @@
 
 .input input {
   width: 100%;
-  padding: 10px;
-  border-radius: 8px;
+  padding: 12px;
+  border-radius: 10px;
   border: 1px solid #ddd;
   margin-top: 4px;
+  transition: 0.2s;
 }
 
+.input input:focus {
+  border-color: #2ecc71;
+  box-shadow: 0 0 5px rgba(46, 204, 113, 0.3);
+}
+
+/* Button */
 .directions-btn {
   width: 100%;
   padding: 12px;
-  background: green;
+  background: linear-gradient(135deg, #2ecc71, #27ae60);
   color: white;
   border: none;
-  border-radius: 10px;
+  border-radius: 12px;
   cursor: pointer;
   margin-top: 10px;
+  font-weight: 600;
+  transition: 0.3s;
 }
 
-/* 🔥 FILTERS */
-.filters {
-  margin-top: 20px;
+.directions-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 12px rgba(46, 204, 113, 0.4);
 }
 
-.filters h4 {
+/* 🔥 AI SECTION */
+.ai-section {
+  margin-top: 25px;
+}
+
+.ai-section h4 {
   margin-bottom: 10px;
 }
 
-.filter {
-  padding: 10px;
-  margin-top: 8px;
-  background: #f5f5f5;
-  border-radius: 8px;
+/* AI BUTTON */
+.ai-btn {
+  width: 100%;
+  padding: 12px;
+  border-radius: 12px;
+  border: none;
+  background: linear-gradient(135deg, #000, #333);
+  color: white;
   cursor: pointer;
-  transition: 0.2s;
+  font-weight: 600;
+  transition: 0.3s;
 }
 
-.filter:hover {
-  background: #eaeaea;
+.ai-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(0,0,0,0.3);
 }
 
-.filter.active {
-  background: #d4f5d4;
-  color: green;
-}
 
-/* 🔥 PLACES */
-.places {
-  margin-top: 20px;
-}
-
-.places h4 {
-  margin-bottom: 10px;
-}
-
-.icons {
-  display: flex;
-  gap: 10px;
-}
-
-.icons div {
-  font-size: 20px;
-  background: #eee;
-  padding: 10px;
-  border-radius: 50%;
-  cursor: pointer;
-  transition: 0.2s;
-}
-
-.icons div:hover {
-  background: #ddd;
-}
-
-/* 🔥 RESIZE HANDLE (Sidebar) */
+/* RESIZE HANDLE (Sidebar) */
 .resize-handle {
   width: 6px;
   cursor: col-resize;
@@ -131,7 +123,6 @@
   background: #ddd;
 }
 
-/* Optional divider */
 .resize-handle::after {
   content: "";
   position: absolute;
@@ -154,7 +145,7 @@
   width: 100%;
 }
 
-/* Search bar */
+/* 🔥 Search bar (GLASS EFFECT) */
 .search-bar {
   position: absolute;
   top: 20px;
@@ -164,54 +155,62 @@
 }
 
 .search-bar input {
-  width: 400px;
-  padding: 12px;
-  border-radius: 25px;
+  width: 420px;
+  padding: 14px;
+  border-radius: 30px;
   border: none;
   outline: none;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+  backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+  transition: 0.3s;
 }
 
-/* 🔥 UPDATED BOTTOM PANEL (RESIZABLE) */
+.search-bar input:focus {
+  box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+}
+
+/* 🔥 BOTTOM PANEL */
 .bottom-panel {
   position: absolute;
   bottom: 0;
   width: 100%;
-  background: white;
+  background: #ffffff;
   border-radius: 20px 20px 0 0;
   z-index: 1000;
 
   display: flex;
   flex-direction: column;
   overflow: hidden;
+
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.1);
 }
 
-/* 🔥 PANEL RESIZE HANDLE */
+/* PANEL RESIZE HANDLE */
 .panel-resize-handle {
-  height: 8px;
+  height: 10px;
   cursor: row-resize;
   background: transparent;
   position: relative;
 }
 
 .panel-resize-handle:hover {
-  background: #eee;
+  background: #f0f0f0;
 }
 
-/* Drag indicator */
 .panel-resize-handle::after {
   content: "";
   position: absolute;
-  top: 3px;
+  top: 4px;
   left: 50%;
   transform: translateX(-50%);
-  width: 40px;
-  height: 4px;
+  width: 50px;
+  height: 5px;
   background: #ccc;
   border-radius: 10px;
 }
 
-/* 🔥 PANEL CONTENT (SCROLLABLE) */
+/* PANEL CONTENT */
 .bottom-panel-content {
   padding: 15px;
   overflow-y: auto;
@@ -221,25 +220,27 @@
 /* Cards */
 .cards {
   display: flex;
-  gap: 10px;
-  margin-top: 10px;
+  gap: 12px;
+  margin-top: 12px;
 }
 
 .card {
   flex: 1;
-  padding: 10px;
-  border-radius: 12px;
+  padding: 12px;
+  border-radius: 14px;
   background: #f3f3f3;
   cursor: pointer;
-  transition: 0.2s;
+  transition: 0.25s;
 }
 
 .card:hover {
-  transform: scale(1.03);
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 6px 15px rgba(0,0,0,0.1);
 }
 
 .card.active {
-  border: 2px solid green;
+  border: 2px solid #2ecc71;
+  background: #ecfff3;
 }
 
 .card h4 {
@@ -248,6 +249,7 @@
 
 .card p {
   font-weight: bold;
+  margin: 5px 0;
 }
 
 .card span {
@@ -264,17 +266,29 @@
 
 .filter-btn {
   padding: 10px 20px;
-  border-radius: 10px;
+  border-radius: 12px;
   border: none;
   background: #eee;
   cursor: pointer;
+  transition: 0.2s;
+}
+
+.filter-btn:hover {
+  background: #ddd;
 }
 
 .start-btn {
   padding: 10px 20px;
-  border-radius: 10px;
+  border-radius: 12px;
   border: none;
-  background: green;
+  background: linear-gradient(135deg, #2ecc71, #27ae60);
   color: white;
   cursor: pointer;
+  font-weight: 600;
+  transition: 0.3s;
+}
+
+.start-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 5px 12px rgba(46, 204, 113, 0.4);
 }
