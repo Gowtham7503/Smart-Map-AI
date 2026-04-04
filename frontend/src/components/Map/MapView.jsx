@@ -1,128 +1,148 @@
-﻿import { useMap } from "react-leaflet";
-import { useEffect, useState } from "react";
-import "./Map.css";
+import { useState } from "react";
 import polyline from "polyline";
 import axios from "axios";
-import {
-  MapContainer,
-  TileLayer,
-  Marker,
-  Polyline,
-  Popup,
-} from "react-leaflet";
-import L from "leaflet";
 import { getRoute } from "../../services/api";
-import "leaflet/dist/leaflet.css";
+import MapBottomPanel from "./MapBottomPanel";
+import MapCanvas from "./MapCanvas";
+import "./Map.css";
+import MapSearchBar from "./MapSearchBar";
+import MapSidebar from "./MapSidebar";
 
-// ✅ Enable scroll zoom
-const EnableZoom = () => {
-  const map = useMap();
+const defaultCenter = [17.4948, 78.3996];
+const LAST_SEARCH_STORAGE_KEY = "smartmap:last-search";
 
-  useEffect(() => {
-    map.scrollWheelZoom.enable();
-  }, [map]);
+const getSavedSearch = () => {
+  try {
+    const savedSearch = localStorage.getItem(LAST_SEARCH_STORAGE_KEY);
 
-  return null;
+    if (!savedSearch) {
+      return null;
+    }
+
+    const parsedSearch = JSON.parse(savedSearch);
+
+    if (!Array.isArray(parsedSearch.coordinates)) {
+      return null;
+    }
+
+    return parsedSearch;
+  } catch (error) {
+    console.error("Unable to read saved search:", error);
+    return null;
+  }
 };
-
-const MapControls = ({ bottomOffset }) => {
-  const map = useMap();
-
-  const handleLocate = () => {
-    if (!navigator.geolocation) return;
-
-    navigator.geolocation.getCurrentPosition((pos) => {
-      const { latitude, longitude } = pos.coords;
-      map.setView([latitude, longitude], 15);
-    });
-  };
-
-  return (
-    <>
-      <div className="map-controls">
-        <button className="map-btn">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none">
-            <path
-              d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2V6z"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinejoin="round"
-            />
-            <path d="M9 4v14M15 6v14" stroke="currentColor" strokeWidth="2" />
-          </svg>
-        </button>
-      </div>
-
-      <div className="map-controls-bottom" style={{ bottom: bottomOffset + 12 }}>
-        <button className="control-btn" onClick={handleLocate}>
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none">
-            <path
-              d="M12 21s-6-5.5-6-10a6 6 0 1 1 12 0c0 4.5-6 10-6 10z"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-            <circle cx="12" cy="11" r="2" fill="currentColor" />
-          </svg>
-        </button>
-
-        <button className="control-btn" onClick={() => map.zoomIn()}>
-          +
-        </button>
-
-        <button className="control-btn" onClick={() => map.zoomOut()}>
-          −
-        </button>
-      </div>
-    </>
-  );
-};
-
-// ✅ Marker fix
-import markerIcon from "leaflet/dist/images/marker-icon.png";
-import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
-import markerShadow from "leaflet/dist/images/marker-shadow.png";
-
-delete L.Icon.Default.prototype._getIconUrl;
-
-L.Icon.Default.mergeOptions({
-  iconUrl: markerIcon,
-  iconRetinaUrl: markerIcon2x,
-  shadowUrl: markerShadow,
-});
-
-// 🌍 Default positions
-const defaultStart = [17.4948, 78.3996];
-const defaultEnd = [17.4435, 78.3772];
 
 const MapView = () => {
+  const savedSearch = getSavedSearch();
+
   const [showSidebar, setShowSidebar] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(320);
   const [panelHeight, setPanelHeight] = useState(200);
-
   const [dragSidebar, setDragSidebar] = useState(false);
   const [dragPanel, setDragPanel] = useState(false);
-
   const [routeCoords, setRouteCoords] = useState([]);
   const [mode, setMode] = useState("car");
-
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [searchQuery, setSearchQuery] = useState(savedSearch?.label || "");
+  const [searchPosition, setSearchPosition] = useState(
+    savedSearch?.coordinates || null,
+  );
+  const [searchLabel, setSearchLabel] = useState(savedSearch?.label || "");
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchBounds, setSearchBounds] = useState(savedSearch?.bounds || null);
+  const [searchOutline, setSearchOutline] = useState(
+    savedSearch?.geojson || null,
+  );
+  const [startPosition, setStartPosition] = useState(null);
+  const [endPosition, setEndPosition] = useState(null);
+  const [mapFocusPosition, setMapFocusPosition] = useState(
+    savedSearch?.coordinates || defaultCenter,
+  );
+  const [filters, setFilters] = useState({
+    safest: true,
+    pollution: false,
+    traffic: false,
+  });
 
-  const [startPosition, setStartPosition] = useState(defaultStart);
-  const [endPosition, setEndPosition] = useState(defaultEnd);
+  const buildBounds = (boundingbox) => {
+    if (!Array.isArray(boundingbox) || boundingbox.length !== 4) {
+      return null;
+    }
 
-  // 🔍 Convert place → coordinates
-  const getCoordinates = async (place) => {
-    const res = await axios.get(
-      `https://nominatim.openstreetmap.org/search?format=json&q=${place}`,
-    );
-
-    return [parseFloat(res.data[0].lat), parseFloat(res.data[0].lon)];
+    const [south, north, west, east] = boundingbox.map(parseFloat);
+    return [
+      [south, west],
+      [north, east],
+    ];
   };
 
-  // 🚀 Fetch route
+  const getCurrentLocation = () =>
+    new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error("Geolocation is not supported in this browser."));
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          resolve([pos.coords.latitude, pos.coords.longitude]);
+        },
+        () => reject(new Error("Unable to get your current location.")),
+      );
+    });
+
+  const getPlaceDetails = async (place) => {
+    const trimmedPlace = place.trim();
+
+    if (!trimmedPlace) {
+      throw new Error("Please enter a location.");
+    }
+
+    if (trimmedPlace.toLowerCase() === "my location") {
+      const currentLocation = await getCurrentLocation();
+
+      return {
+        coordinates: currentLocation,
+        bounds: null,
+        geojson: null,
+        label: "My Location",
+      };
+    }
+
+    const res = await axios.get(
+      `https://nominatim.openstreetmap.org/search?format=json&polygon_geojson=1&q=${encodeURIComponent(trimmedPlace)}`,
+    );
+
+    if (!res.data?.length) {
+      throw new Error(`No results found for "${trimmedPlace}".`);
+    }
+
+    const result =
+      res.data.find(
+        (item) =>
+          item.geojson &&
+          (item.type === "administrative" ||
+            item.class === "boundary" ||
+            item.class === "place"),
+      ) ||
+      res.data.find((item) => item.geojson) ||
+      res.data.find((item) => item.boundingbox) ||
+      res.data[0];
+
+    return {
+      coordinates: [parseFloat(result.lat), parseFloat(result.lon)],
+      bounds: buildBounds(result.boundingbox),
+      geojson: result.geojson || null,
+      label: result.display_name || trimmedPlace,
+    };
+  };
+
+  const getCoordinates = async (place) => {
+    const details = await getPlaceDetails(place);
+    return details.coordinates;
+  };
+
   const fetchRoute = async () => {
     try {
       if (!from || !to) {
@@ -135,6 +155,7 @@ const MapView = () => {
 
       setStartPosition(start);
       setEndPosition(end);
+      setMapFocusPosition(start);
 
       const response = await getRoute([
         [start[1], start[0]],
@@ -148,240 +169,119 @@ const MapView = () => {
 
       const encoded = response.data.routes[0].geometry;
       const decoded = polyline.decode(encoded);
-
       const formatted = decoded.map(([lat, lng]) => [lat, lng]);
 
-      setRouteCoords([...formatted]); // 🔥 FORCE NEW ARRAY
+      setRouteCoords([...formatted]);
     } catch (error) {
       console.error("Routing error:", error);
+      alert(error.message || "Unable to fetch the route.");
     }
   };
 
-  // 🖱 Resize handling
+  const handleSearch = async (e) => {
+    e.preventDefault();
+
+    try {
+      setSearchLoading(true);
+
+      const placeDetails = await getPlaceDetails(searchQuery);
+
+      setSearchPosition(placeDetails.coordinates);
+      setSearchLabel(placeDetails.label);
+      setSearchBounds(placeDetails.bounds);
+      setSearchOutline(placeDetails.geojson);
+      setMapFocusPosition(placeDetails.coordinates);
+
+      localStorage.setItem(
+        LAST_SEARCH_STORAGE_KEY,
+        JSON.stringify(placeDetails),
+      );
+    } catch (error) {
+      console.error("Search error:", error);
+      alert(error.message || "Unable to find that location.");
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+
+  const handleDirectionsFromSearch = () => {
+    if (showSidebar) {
+      setShowSidebar(false);
+      return;
+    }
+
+    const destination = searchQuery.trim() || searchLabel;
+
+    setShowSidebar(true);
+    setFrom("My Location");
+
+    if (destination) {
+      setTo(destination);
+    }
+  };
+
   const handleMouseMove = (e) => {
     if (dragSidebar) {
       const width = e.clientX;
-      if (width > 220 && width < 500) setSidebarWidth(width);
+      if (width > 220 && width < 500) {
+        setSidebarWidth(width);
+      }
     }
 
     if (dragPanel) {
       const height = window.innerHeight - e.clientY;
-      if (height > 120 && height < 400) setPanelHeight(height);
+      if (height > 120 && height < 400) {
+        setPanelHeight(height);
+      }
     }
   };
 
-  const [filters, setFilters] = useState({
-    safest: true,
-    pollution: false,
-    traffic: false,
-  });
+  const handleMouseUp = () => {
+    setDragSidebar(false);
+    setDragPanel(false);
+  };
+
+  const handleSwapLocations = () => {
+    const temp = from;
+    setFrom(to);
+    setTo(temp);
+  };
+
+  const handleFilterToggle = (filterName) => {
+    setFilters((currentFilters) => ({
+      ...currentFilters,
+      [filterName]: !currentFilters[filterName],
+    }));
+  };
+
+  const handleClearFilters = () => {
+    setFilters({
+      safest: false,
+      pollution: false,
+      traffic: false,
+    });
+  };
 
   return (
     <div
       className="map-container"
       onMouseMove={handleMouseMove}
-      onMouseUp={() => {
-        setDragSidebar(false);
-        setDragPanel(false);
-      }}
+      onMouseUp={handleMouseUp}
     >
-      {/* SIDEBAR */}
-      {showSidebar && (
-        <div className="sidebar" style={{ width: sidebarWidth }}>
-          <div className="logo">
-            <h2>
-              Smart<span>Maps</span>
-            </h2>
-            <p>Safe • Smart • Sustainable</p>
-          </div>
+      <MapSidebar
+        fetchRoute={fetchRoute}
+        filters={filters}
+        from={from}
+        onClearFilters={handleClearFilters}
+        onFilterToggle={handleFilterToggle}
+        onSwapLocations={handleSwapLocations}
+        setFrom={setFrom}
+        setTo={setTo}
+        showSidebar={showSidebar}
+        sidebarWidth={sidebarWidth}
+        to={to}
+      />
 
-        {/* FORM */}
-        <form
-          className="route-box"
-          onSubmit={(e) => {
-            e.preventDefault();
-            fetchRoute();
-          }}
-        >
-          {/* FROM FIELD */}
-          <div className="route-field">
-            <div className="icon green-dot"></div>
-
-            <div className="field-content">
-              <label>From</label>
-              <input
-                value={from}
-                onChange={(e) => setFrom(e.target.value)}
-                placeholder="My Location"
-              />
-            </div>
-
-            <button
-              type="button"
-              className="icon-btn"
-              onClick={() => setFrom("My Location")}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24">
-                <path
-                  fill="currentColor"
-                  d="M19.14 12.94a7.49 7.49 0 000-1.88l2.03-1.58a.5.5 0 00.12-.65l-1.92-3.32a.5.5 0 00-.6-.22l-2.39.96a7.28 7.28 0 00-1.63-.95l-.36-2.54a.5.5 0 00-.5-.42h-3.84a.5.5 0 00-.5.42l-.36 2.54c-.58.23-1.12.54-1.63.95l-2.39-.96a.5.5 0 00-.6.22L2.71 8.83a.5.5 0 00.12.65l2.03 1.58a7.49 7.49 0 000 1.88l-2.03 1.58a.5.5 0 00-.12.65l1.92 3.32c.14.24.43.34.7.22l2.39-.96c.51.41 1.05.73 1.63.95l.36 2.54c.05.26.26.42.5.42h3.84c.24 0 .45-.16.5-.42l.36-2.54c.58-.23 1.12-.54 1.63-.95l2.39.96c.27.12.56.02.7-.22l1.92-3.32a.5.5 0 00-.12-.65l-2.03-1.58zM12 15.5A3.5 3.5 0 1112 8a3.5 3.5 0 010 7.5z"
-                />
-              </svg>
-            </button>
-          </div>
-
-          {/* DIVIDER LINE */}
-          <div className="divider"></div>
-
-          {/* TO FIELD */}
-          <div className="route-field">
-            <div className="icon red-dot"></div>
-
-            <div className="field-content">
-              <label>To</label>
-              <input
-                value={to}
-                onChange={(e) => setTo(e.target.value)}
-                placeholder="Enter destination"
-              />
-            </div>
-
-            <button
-              type="button"
-              className="icon-btn swap-btn"
-              onClick={() => {
-                const temp = from;
-                setFrom(to);
-                setTo(temp);
-              }}
-            >
-              ⇅
-            </button>
-          </div>
-
-          {/* BUTTON */}
-          <button type="submit" className="directions-btn">
-            <svg width="18" height="18" viewBox="0 0 24 24">
-              <path fill="currentColor" d="M3 11l18-8-8 18-2-7-8-3z" />
-            </svg>
-            Get Directions
-          </button>
-        </form>
-
-        {/* checklistcomponent */}
-        <div className="filters-section">
-          <div className="filters-header">
-            <h4>Quick Filters</h4>
-            <span
-              className="clear-btn"
-              onClick={() =>
-                setFilters({
-                  safest: false,
-                  pollution: false,
-                  traffic: false,
-                })
-              }
-            >
-              Clear
-            </span>
-          </div>
-
-          {/* SAFEST */}
-          <div
-            className={`filter-item ${filters.safest ? "active" : ""}`}
-            onClick={() => setFilters({ ...filters, safest: !filters.safest })}
-          >
-            <div className="filter-left">
-              <div className="filter-icon green">
-                <svg viewBox="0 0 24 24" width="18" height="18">
-                  <path
-                    fill="currentColor"
-                    d="M12 2L4 5v6c0 5 3.4 9.7 8 11 4.6-1.3 8-6 8-11V5l-8-3z"
-                  />
-                </svg>
-              </div>
-              <div>
-                <p>Safest Route</p>
-                <span>Well-lit, secure roads</span>
-              </div>
-            </div>
-
-            <input type="checkbox" checked={filters.safest} readOnly />
-          </div>
-
-          {/* LOW POLLUTION */}
-          <div
-            className={`filter-item ${filters.pollution ? "active" : ""}`}
-            onClick={() =>
-              setFilters({ ...filters, pollution: !filters.pollution })
-            }
-          >
-            <div className="filter-left">
-              <div className="filter-icon green">
-                <svg viewBox="0 0 24 24" width="18" height="18">
-                  <path
-                    fill="currentColor"
-                    d="M6 21c8-2 12-8 12-16C10 5 6 13 6 21z"
-                  />
-                </svg>
-              </div>
-              <div>
-                <p>Low Pollution</p>
-                <span>Eco-friendly paths</span>
-              </div>
-            </div>
-
-            <input type="checkbox" checked={filters.pollution} readOnly />
-          </div>
-
-          {/* AVOID TRAFFIC */}
-          <div
-            className={`filter-item ${filters.traffic ? "active" : ""}`}
-            onClick={() =>
-              setFilters({ ...filters, traffic: !filters.traffic })
-            }
-          >
-            <div className="filter-left">
-              <div className="filter-icon gray">
-                <svg viewBox="0 0 24 24" width="18" height="18">
-                  <path
-                    fill="currentColor"
-                    d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"
-                  />
-                </svg>
-              </div>
-              <div>
-                <p>Avoid Traffic</p>
-                <span>Live traffic routes</span>
-              </div>
-            </div>
-
-            <input type="checkbox" checked={filters.traffic} readOnly />
-          </div>
-        </div>
-
-          {/* USER LOGIN SECTION */}
-          <div className="user-section">
-            <div
-              className="user-card"
-              onClick={() => alert("Redirect to Login Page")}
-            >
-              <div className="user-left">
-                <div className="user-avatar">G</div>
-
-                <div>
-                  <p>Guest User</p>
-                  <span>Sign in for personalized routes</span>
-                </div>
-              </div>
-
-              <div className="user-arrow">›</div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Resize Handle */}
       {showSidebar && (
         <div
           className="resize-handle"
@@ -389,289 +289,36 @@ const MapView = () => {
         />
       )}
 
-      {/* MAP */}
       <div className="map-area">
-        {/* SEARCH BAR */}
-        <div className={`search-bar ${!showSidebar ? "top-left" : ""}`}>
-          <div className="search-box">
-            <span className="search-icon">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none">
-                <circle
-                  cx="11"
-                  cy="11"
-                  r="7"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                />
-                <line
-                  x1="16.65"
-                  y1="16.65"
-                  x2="21"
-                  y2="21"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </span>
+        <MapSearchBar
+          onDirectionsClick={handleDirectionsFromSearch}
+          onSearch={handleSearch}
+          onSearchChange={setSearchQuery}
+          searchLoading={searchLoading}
+          searchQuery={searchQuery}
+          showSidebar={showSidebar}
+        />
 
-            <input type="text" placeholder="Search location, place..." />
+        <MapCanvas
+          endPosition={endPosition}
+          mapFocusPosition={mapFocusPosition}
+          panelHeight={panelHeight}
+          routeCoords={routeCoords}
+          searchBounds={searchBounds}
+          searchLabel={searchLabel}
+          searchOutline={searchOutline}
+          searchPosition={searchPosition}
+          showSidebar={showSidebar}
+          startPosition={startPosition}
+        />
 
-            <span className="mic-icon">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none">
-                <rect
-                  x="9"
-                  y="3"
-                  width="6"
-                  height="11"
-                  rx="3"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                />
-                <path
-                  d="M5 11a7 7 0 0 0 14 0"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                />
-                <line
-                  x1="12"
-                  y1="18"
-                  x2="12"
-                  y2="22"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                />
-              </svg>
-            </span>
-
-            <button
-              type="button"
-              className="search-directions-btn"
-              onClick={() => setShowSidebar((prev) => !prev)}
-              aria-label="Toggle directions panel"
-            >
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none">
-                <path
-                  d="M14 5l5 5-5 5"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <path
-                  d="M19 10H9a3 3 0 0 0-3 3v6"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </button>
-          </div>
-        </div>
-        <MapContainer
-          center={startPosition}
-          zoom={12}
-          zoomControl={false}
-          className="leaflet-map"
-        >
-          <EnableZoom />
-          <MapControls bottomOffset={showSidebar ? panelHeight : 0} />
-
-          <TileLayer
-            url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-            attribution="&copy; OpenStreetMap &copy; CartoDB"
-          />
-
-          <Marker position={startPosition}>
-            <Popup>Start</Popup>
-          </Marker>
-
-          <Marker position={endPosition}>
-            <Popup>Destination</Popup>
-          </Marker>
-
-          {/* ✅ FIXED POLYLINE */}
-          {routeCoords.length > 0 && (
-            <Polyline
-              key={JSON.stringify(routeCoords)} // 🔥 CRITICAL FIX
-              positions={routeCoords}
-              pathOptions={{
-                color: "#2ecc71",
-                weight: 6,
-                opacity: 1,
-              }}
-            />
-          )}
-        </MapContainer>
-
-        {showSidebar && (
-          <div className="bottom-panel" style={{ height: panelHeight }}>
-            <div
-              className="panel-resize-handle"
-              onMouseDown={() => setDragPanel(true)}
-            />
-
-            {/* VEHICLE MODE SELECTOR */}
-            <div className="vehicle-panel">
-              <div
-                className={`vehicle-btn ${mode === "car" ? "active" : ""}`}
-                onClick={() => setMode("car")}
-              >
-                <svg
-                  className="car-icon"
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 16 16"
-                  width="24"
-                  height="24"
-                  fill="none"
-                >
-                  {/* <!-- Body --> */}
-                  <path
-                    d="M3 1L1.667 5H0V8H1V15H3V13H13V15H15V8H16V5H14.333L13 1H3Z"
-                    className="car-body"
-                  />
-
-                  {/* <!-- Windows --> */}
-                  <path
-                    d="M4.442 3H11.558L12.892 7H3.108L4.442 3Z"
-                    className="car-window"
-                  />
-
-                  {/* <!-- Left Wheel --> */}
-                  <circle cx="4" cy="10" r="1" className="car-wheel" />
-
-                  {/* Right Wheel*/}
-                  <circle cx="12" cy="10" r="1" className="car-wheel" />
-                </svg>
-                <span>Car</span>
-              </div>
-
-              <div
-                className={`vehicle-btn ${mode === "bike" ? "active" : ""}`}
-                onClick={() => setMode("bike")}
-              >
-                <svg
-                  width="22"
-                  height="22"
-                  viewBox="0 0 512 512"
-                  fill="currentColor"
-                >
-                  <path
-                    d="M417.975,226.338c-5.966,0-11.764,0.618-17.404,1.684l-33.048-100.841
-                    c-5.781-17.644-22.258-29.577-40.822-29.577h-45.506v24.414h45.506c8.038-0.008,15.147,5.155,17.636,12.768l6.028,18.433h-60.684
-                    c-31.084,0-54.424,15.542-54.424,15.542v45.358h135.064l7.064,21.54c-31.579,15.163-53.42,47.345-53.435,84.704
-                    c0.016,51.936,42.09,94.018,94.026,94.033c51.92-0.015,94.01-42.097,94.025-94.033
-                    C511.985,268.435,469.895,226.353,417.975,226.338zM461.456,363.844c-11.175,11.144-26.462,18.007-43.48,18.007
-                    c-17.034,0-32.29-6.862-43.466-18.007c-11.144-11.176-18.008-26.447-18.008-43.481c0-17.026,6.863-32.29,18.008-43.465
-                    c3.88-3.88,8.409-7.01,13.185-9.754l11.114,33.928c-4.962,4.931-8.037,11.748-8.037,19.29c0,15.032,12.18,27.22,27.204,27.22
-                    c15.024,0,27.204-12.188,27.204-27.22c0-13.633-10.062-24.809-23.14-26.787l-11.128-33.974c2.35-0.278,4.637-0.711,7.064-0.711
-                    c17.018,0,32.305,6.855,43.48,18.008c11.144,11.175,17.977,26.439,18.008,43.465
-                    C479.432,337.397,472.6,352.668,461.456,363.844z"
-                  />
-
-                  <path
-                    d="M94.01,226.338C42.074,226.353,0.016,268.435,0,320.363
-                    c0.016,51.936,42.074,94.018,94.01,94.033c51.936-0.015,94.01-42.097,94.026-94.033
-                    C188.02,268.435,145.946,226.353,94.01,226.338zM137.491,363.844
-                    c-11.176,11.144-26.447,18.007-43.481,18.007c-17.034,0-32.29-6.862-43.466-18.007
-                    c-11.16-11.176-18.008-26.447-18.008-43.481c0-17.026,6.848-32.29,18.008-43.465
-                    C61.72,265.745,76.976,258.89,94.01,258.89c17.034,0,32.306,6.855,43.481,18.008
-                    c11.144,11.175,17.992,26.439,18.008,43.465
-                    C155.483,337.397,148.636,352.668,137.491,363.844z"
-                  />
-
-                  <path
-                    d="M94.01,293.167c-15.024,0-27.204,12.172-27.204,27.196
-                    c0,15.032,12.18,27.22,27.204,27.22
-                    c15.025,0,27.22-12.188,27.22-27.22
-                    C121.23,305.339,109.035,293.167,94.01,293.167z"
-                  />
-
-                  <path
-                    d="M439.074,207.55v-65.855c-27.854,0-45.583,18.997-45.583,18.997v27.854
-                    C393.491,188.546,411.22,207.55,439.074,207.55z"
-                  />
-
-                  <rect x="450.868" y="141.68" width="13.525" height="65.847" />
-
-                  <path
-                    d="M70.5,214.119H220.17v-42.762h-45.52
-                    c-12.212,0-24.345-1.932-35.954-5.742l-16.261-5.34
-                    c-11.592-3.81-23.742-5.758-35.953-5.758H70.5
-                    c-8.47,0-15.348,6.886-15.348,15.372v28.858
-                    C55.151,207.233,62.029,214.119,70.5,214.119z"
-                  />
-
-                  <path
-                    d="M343.302,232.111v-1.352H167.03
-                    c26.029,21.161,42.708,53.435,42.708,89.636
-                    c0,3.246,1.112,9.761,10.433,9.761h69.928
-                    c8.888,0,12.118-6.515,12.118-9.761
-                    C302.217,284.998,318.199,253.272,343.302,232.111z"
-                  />
-                </svg>
-
-                <span>Bike</span>
-              </div>
-
-              <div
-                className={`vehicle-btn ${mode === "walk" ? "active" : ""}`}
-                onClick={() => setMode("walk")}
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  width="24"
-                  height="24"
-                  fill="none"
-                >
-                  {/* Head */}
-                  <path
-                    d="M13.3692 5.13905C13.3692 6.00924 12.6638 6.71466 11.7936 6.71466C10.9234 6.71466 10.218 6.00924 10.218 5.13905C10.218 4.26887 10.9234 3.56345 11.7936 3.56345C12.6638 3.56345 13.3692 4.26887 13.3692 5.13905Z"
-                    fill="currentColor"
-                    stroke="currentColor"
-                    strokeWidth="1.3"
-                  />
-
-                  {/* Body */}
-                  <path
-                    d="M11.7782 14.8313H9.48168C9.94681 12.7756 9.94681 11.0994 9.94681 9.42322L12.1943 9.64358C12.1943 11.2195 11.7782 13.0771 11.7782 14.8313Z"
-                    fill="currentColor"
-                  />
-
-                  {/* Legs */}
-                  <path
-                    d="M9.48168 14.8313C8.09375 17.284 6.95068 21.1119 6.95068 21.1119M11.7782 14.8313C13.2124 17.284 12.4653 21.1119 12.4653 21.1119"
-                    stroke="currentColor"
-                    strokeWidth="2.2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-
-                  {/* Right arm */}
-                  <path
-                    d="M12.6599 9.42322L14.8501 12.9967L17.5324 11.8874"
-                    stroke="currentColor"
-                    strokeWidth="1.6"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-
-                  {/* Left arm */}
-                  <path
-                    d="M9.80518 9.08887L6.53081 10.0556L8.79988 13.627"
-                    stroke="currentColor"
-                    strokeWidth="1.6"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-                <span>Walk</span>
-              </div>
-            </div>
-          </div>
-        )}
+        <MapBottomPanel
+          mode={mode}
+          onModeChange={setMode}
+          onResizeStart={() => setDragPanel(true)}
+          panelHeight={panelHeight}
+          showSidebar={showSidebar}
+        />
       </div>
     </div>
   );
