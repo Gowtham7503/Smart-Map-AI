@@ -1,64 +1,44 @@
-smartmaps/
-│
-├── frontend/                # React App
+﻿smartmap/
+├── frontend/                     # React + Vite app
 │   ├── public/
+│   │   ├── favicon.svg
+│   │   └── icons.svg
 │   ├── src/
-│   │   ├── components/      # Reusable UI components
+│   │   ├── components/
 │   │   │   ├── Map/
-│   │   │   │   ├── MapView.jsx
-│   │   │   │   └── Map.css
-│   │   │   │
+│   │   │   │   ├── MapBottomPanel.jsx
+│   │   │   │   ├── MapCanvas.jsx
+│   │   │   │   ├── Map.css
+│   │   │   │   ├── MapSearchBar.jsx
+│   │   │   │   ├── MapSidebar.jsx
+│   │   │   │   └── MapView.jsx
 │   │   │   ├── Route/
-│   │   │   │   ├── RouteForm.jsx
-│   │   │   │   └── Route.css
-│   │   │   │
-│   │   │   ├── UI/
-│   │   │   │   ├── Button.jsx
-│   │   │   │   └── Loader.jsx
-│   │   │
-│   │   ├── pages/           # Full pages
-│   │   │   ├── Home.jsx
-│   │   │   └── Dashboard.jsx
-│   │   │
-│   │   ├── services/        # API calls (Flask)
+│   │   │   │   ├── Route.css
+│   │   │   │   └── RouteForm.jsx
+│   │   │   └── UI/
+│   │   │       ├── Button.css
+│   │   │       ├── Button.jsx
+│   │   │       └── Loader.jsx
+│   │   ├── pages/
+│   │   │   ├── Dashboard.jsx
+│   │   │   └── Home.jsx
+│   │   ├── services/
 │   │   │   └── api.js
-│   │   │
-│   │   ├── hooks/           # Custom hooks
-│   │   │   └── useLocation.js
-│   │   │
+│   │   ├── App.css
 │   │   ├── App.jsx
-│   │   ├── main.jsx
-│   │   └── index.css
-│   │
-│   └── package.json
-│
-├── backend/                 # Flask App
+│   │   ├── index.css
+│   │   └── main.jsx
+│   ├── eslint.config.js
+│   ├── index.html
+│   ├── package-lock.json
+│   ├── package.json
+│   ├── README.md
+│   └── vite.config.js
+├── backend/                      # Flask app
 │   ├── app/
-│   │   ├── routes/          # API routes
-│   │   │   ├── route_api.py
-│   │   │   ├── user_api.py
-│   │   │
-│   │   ├── services/        # Logic (routing, scoring)
-│   │   │   ├── routing_service.py
-│   │   │   ├── pollution_service.py
-│   │   │   └── safety_service.py
-│   │   │
-│   │   ├── models/          # DB models
-│   │   │   ├── user.py
-│   │   │   ├── route.py
-│   │   │
-│   │   ├── utils/           # Helpers
-│   │   │   └── helpers.py
-│   │   │
-│   │   └── __init__.py      # App factory
-│   │
-│   ├── config.py
-│   ├── run.py
-│   └── requirements.txt
-│
-├── database/
-│   └── schema.sql           # MySQL tables
-│
-├── .env                     # API keys
-├── README.md
-└── .gitignore
+│   │   ├── routes/
+│   │   │   └── route_api.py
+│   │   └── __init__.py
+│   └── run.py
+├── .gitignore
+└── folder_architecture.txt
