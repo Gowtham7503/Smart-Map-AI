@@ -1,4 +1,4 @@
-﻿smartmap/
+smartmaps/
 ├── frontend/                     # React + Vite app
 │   ├── public/
 │   │   ├── favicon.svg
