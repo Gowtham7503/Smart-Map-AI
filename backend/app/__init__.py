@@ -1,10 +1,9 @@
 from flask import Flask
-from app.routes.route_api import route_bp
+
+from app.routes.route_api import api
+
 
 def create_app():
     app = Flask(__name__)
-
-    # ✅ Register route API
-    app.register_blueprint(route_bp, url_prefix="/api")
-
+    app.register_blueprint(api, url_prefix="/api")
     return app

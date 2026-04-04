@@ -1,12 +1,14 @@
-const MapBottomPanel = ({ mode, onModeChange, onResizeStart, panelHeight, showSidebar }) => {
-  if (!showSidebar) {
+const MapBottomPanel = ({ mode, onModeChange, onResizeStart, panelHeight, place, showSidebar }) => {
+  if (!showSidebar || place) {
     return null;
   }
 
   return (
-    <div className="bottom-panel" style={{ height: panelHeight }}>
+    <div
+      className="bottom-panel"
+      style={{ height: panelHeight }}
+    >
       <div className="panel-resize-handle" onMouseDown={onResizeStart} />
-
       <div className="vehicle-panel">
         <div
           className={`vehicle-btn ${mode === "car" ? "active" : ""}`}

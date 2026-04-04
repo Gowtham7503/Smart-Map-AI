@@ -3,8 +3,8 @@ import {
   GeoJSON,
   MapContainer,
   Marker,
-  Polyline,
   Popup,
+  Polyline,
   Rectangle,
   TileLayer,
   useMap,
@@ -119,6 +119,7 @@ const MapViewportController = ({ focusBounds, focusPosition, routeCoords }) => {
 
 const MapCanvas = ({
   endPosition,
+  handlePlaceClick,
   mapFocusPosition,
   panelHeight,
   routeCoords,
@@ -126,9 +127,23 @@ const MapCanvas = ({
   searchLabel,
   searchOutline,
   searchPosition,
+  setHoveredPlace,
   showSidebar,
   startPosition,
 }) => {
+  const renderInteractiveMarker = (place, popupLabel) => (
+    <Marker
+      position={place.position}
+      eventHandlers={{
+        mouseover: () => setHoveredPlace(place),
+        mouseout: () => setHoveredPlace(null),
+        click: () => handlePlaceClick(place),
+      }}
+    >
+      <Popup>{popupLabel}</Popup>
+    </Marker>
+  );
+
   return (
     <MapContainer
       center={mapFocusPosition}
@@ -149,23 +164,35 @@ const MapCanvas = ({
         attribution="&copy; OpenStreetMap &copy; CartoDB"
       />
 
-      {startPosition && (
-        <Marker position={startPosition}>
-          <Popup>Start</Popup>
-        </Marker>
-      )}
+      {startPosition &&
+        renderInteractiveMarker(
+          {
+            name: "Start",
+            category: "Route point",
+            position: startPosition,
+          },
+          "Start",
+        )}
 
-      {endPosition && (
-        <Marker position={endPosition}>
-          <Popup>Destination</Popup>
-        </Marker>
-      )}
+      {endPosition &&
+        renderInteractiveMarker(
+          {
+            name: "Destination",
+            category: "Route point",
+            position: endPosition,
+          },
+          "Destination",
+        )}
 
-      {searchPosition && !searchOutline && (
-        <Marker position={searchPosition}>
-          <Popup>{searchLabel || "Searched location"}</Popup>
-        </Marker>
-      )}
+      {searchPosition &&
+        renderInteractiveMarker(
+          {
+            name: searchLabel || "Searched location",
+            category: "Location",
+            position: searchPosition,
+          },
+          searchLabel || "Searched location",
+        )}
 
       {searchOutline && (
         <GeoJSON

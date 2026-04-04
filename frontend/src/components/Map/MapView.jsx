@@ -1,9 +1,10 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import polyline from "polyline";
 import axios from "axios";
 import { getRoute } from "../../services/api";
 import MapBottomPanel from "./MapBottomPanel";
 import MapCanvas from "./MapCanvas";
+import PlaceHoverCard from "./PlaceHoverCard";
 import "./Map.css";
 import MapSearchBar from "./MapSearchBar";
 import MapSidebar from "./MapSidebar";
@@ -59,6 +60,11 @@ const MapView = () => {
   const [mapFocusPosition, setMapFocusPosition] = useState(
     savedSearch?.coordinates || defaultCenter,
   );
+  const [hoveredPlace, setHoveredPlace] = useState(null);
+  const [selectedPlace, setSelectedPlace] = useState(null);
+  const [selectedPlacePosition, setSelectedPlacePosition] = useState(null);
+  const [placeDetailsLoading, setPlaceDetailsLoading] = useState(false);
+  const [placeDetailsError, setPlaceDetailsError] = useState("");
   const [filters, setFilters] = useState({
     safest: true,
     pollution: false,
@@ -191,13 +197,36 @@ const MapView = () => {
       setSearchBounds(placeDetails.bounds);
       setSearchOutline(placeDetails.geojson);
       setMapFocusPosition(placeDetails.coordinates);
+      setSelectedPlacePosition(placeDetails.coordinates);
 
       localStorage.setItem(
         LAST_SEARCH_STORAGE_KEY,
         JSON.stringify(placeDetails),
       );
+
+      setPlaceDetailsLoading(true);
+      setPlaceDetailsError("");
+
+      try {
+        const data = await fetchPlaceDetails(placeDetails.label);
+        setSelectedPlace(data);
+      } catch (detailsError) {
+        console.error("Place details error:", detailsError);
+        setSelectedPlace({
+          name: placeDetails.label,
+          description: "Place details are not available right now.",
+          images: [],
+        });
+        setPlaceDetailsError(
+          detailsError.message || "Unable to fetch place details.",
+        );
+      } finally {
+        setPlaceDetailsLoading(false);
+      }
     } catch (error) {
       console.error("Search error:", error);
+      setSelectedPlace(null);
+      setSelectedPlacePosition(null);
       alert(error.message || "Unable to find that location.");
     } finally {
       setSearchLoading(false);
@@ -205,6 +234,11 @@ const MapView = () => {
   };
 
   const handleDirectionsFromSearch = () => {
+    setSelectedPlace(null);
+    setSelectedPlacePosition(null);
+    setPlaceDetailsError("");
+    setPlaceDetailsLoading(false);
+
     if (showSidebar) {
       setShowSidebar(false);
       return;
@@ -262,6 +296,39 @@ const MapView = () => {
     });
   };
 
+  const fetchPlaceDetails = async (place) => {
+    const res = await fetch(`/api/place-details?q=${encodeURIComponent(place)}`);
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.error || "Unable to fetch place details.");
+    }
+
+    return data;
+  };
+
+  const handlePlaceClick = async (place) => {
+    setSelectedPlacePosition(place.position || searchPosition);
+    setPlaceDetailsLoading(true);
+    setPlaceDetailsError("");
+    setSelectedPlace({
+      name: place.name,
+      description: "Fetching place details...",
+      images: [],
+    });
+
+    try {
+      const data = await fetchPlaceDetails(place.name);
+      setSelectedPlace(data);
+    } catch (err) {
+      console.error(err);
+      setSelectedPlace(null);
+      setPlaceDetailsError(err.message || "Unable to fetch place details.");
+    } finally {
+      setPlaceDetailsLoading(false);
+    }
+  };
+
   return (
     <div
       className="map-container"
@@ -301,6 +368,7 @@ const MapView = () => {
 
         <MapCanvas
           endPosition={endPosition}
+          handlePlaceClick={handlePlaceClick}
           mapFocusPosition={mapFocusPosition}
           panelHeight={panelHeight}
           routeCoords={routeCoords}
@@ -308,15 +376,33 @@ const MapView = () => {
           searchLabel={searchLabel}
           searchOutline={searchOutline}
           searchPosition={searchPosition}
+          setHoveredPlace={setHoveredPlace}
           showSidebar={showSidebar}
           startPosition={startPosition}
         />
+
+        {hoveredPlace && !selectedPlace && (
+          <PlaceHoverCard
+            place={hoveredPlace}
+            onViewMore={() => handlePlaceClick(hoveredPlace)}
+          />
+        )}
+
+        {selectedPlacePosition && selectedPlace && (
+          <PlaceHoverCard
+            detailMode
+            error={placeDetailsError}
+            loading={placeDetailsLoading}
+            place={selectedPlace}
+          />
+        )}
 
         <MapBottomPanel
           mode={mode}
           onModeChange={setMode}
           onResizeStart={() => setDragPanel(true)}
           panelHeight={panelHeight}
+          place={selectedPlace}
           showSidebar={showSidebar}
         />
       </div>
