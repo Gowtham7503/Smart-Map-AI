@@ -1,83 +1,148 @@
-import { useMap } from "react-leaflet";
-import { useEffect } from "react";
-import React, { useState } from "react";
-import "./Map.css";
+import { useState } from "react";
 import polyline from "polyline";
 import axios from "axios";
-import {
-  MapContainer,
-  TileLayer,
-  Marker,
-  Polyline,
-  Popup,
-} from "react-leaflet";
-import L from "leaflet";
 import { getRoute } from "../../services/api";
-import "leaflet/dist/leaflet.css";
+import MapBottomPanel from "./MapBottomPanel";
+import MapCanvas from "./MapCanvas";
+import "./Map.css";
+import MapSearchBar from "./MapSearchBar";
+import MapSidebar from "./MapSidebar";
 
-// ✅ Enable scroll zoom
-const EnableZoom = () => {
-  const map = useMap();
+const defaultCenter = [17.4948, 78.3996];
+const LAST_SEARCH_STORAGE_KEY = "smartmap:last-search";
 
-  useEffect(() => {
-    map.scrollWheelZoom.enable();
-  }, [map]);
+const getSavedSearch = () => {
+  try {
+    const savedSearch = localStorage.getItem(LAST_SEARCH_STORAGE_KEY);
 
-  return null;
+    if (!savedSearch) {
+      return null;
+    }
+
+    const parsedSearch = JSON.parse(savedSearch);
+
+    if (!Array.isArray(parsedSearch.coordinates)) {
+      return null;
+    }
+
+    return parsedSearch;
+  } catch (error) {
+    console.error("Unable to read saved search:", error);
+    return null;
+  }
 };
 
-// ✅ Marker fix
-import markerIcon from "leaflet/dist/images/marker-icon.png";
-import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
-import markerShadow from "leaflet/dist/images/marker-shadow.png";
-
-delete L.Icon.Default.prototype._getIconUrl;
-
-L.Icon.Default.mergeOptions({
-  iconUrl: markerIcon,
-  iconRetinaUrl: markerIcon2x,
-  shadowUrl: markerShadow,
-});
-
-// 🌍 Default positions
-const defaultStart = [17.4948, 78.3996];
-const defaultEnd = [17.4435, 78.3772];
-
 const MapView = () => {
+  const savedSearch = getSavedSearch();
+
+  const [showSidebar, setShowSidebar] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(320);
   const [panelHeight, setPanelHeight] = useState(200);
-
   const [dragSidebar, setDragSidebar] = useState(false);
   const [dragPanel, setDragPanel] = useState(false);
-
-  const [selectedRoute, setSelectedRoute] = useState(0);
   const [routeCoords, setRouteCoords] = useState([]);
-
+  const [mode, setMode] = useState("car");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [searchQuery, setSearchQuery] = useState(savedSearch?.label || "");
+  const [searchPosition, setSearchPosition] = useState(
+    savedSearch?.coordinates || null,
+  );
+  const [searchLabel, setSearchLabel] = useState(savedSearch?.label || "");
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchBounds, setSearchBounds] = useState(savedSearch?.bounds || null);
+  const [searchOutline, setSearchOutline] = useState(
+    savedSearch?.geojson || null,
+  );
+  const [startPosition, setStartPosition] = useState(null);
+  const [endPosition, setEndPosition] = useState(null);
+  const [mapFocusPosition, setMapFocusPosition] = useState(
+    savedSearch?.coordinates || defaultCenter,
+  );
+  const [filters, setFilters] = useState({
+    safest: true,
+    pollution: false,
+    traffic: false,
+  });
 
-  const [startPosition, setStartPosition] = useState(defaultStart);
-  const [endPosition, setEndPosition] = useState(defaultEnd);
+  const buildBounds = (boundingbox) => {
+    if (!Array.isArray(boundingbox) || boundingbox.length !== 4) {
+      return null;
+    }
 
-  const routes = [
-    { type: "Fastest", color: "#2ecc71" },
-    { type: "Safest", color: "#27ae60" },
-    { type: "Eco", color: "#00b894" },
-  ];
-
-  // 🔍 Convert place → coordinates
-  const getCoordinates = async (place) => {
-    const res = await axios.get(
-      `https://nominatim.openstreetmap.org/search?format=json&q=${place}`
-    );
-
+    const [south, north, west, east] = boundingbox.map(parseFloat);
     return [
-      parseFloat(res.data[0].lat),
-      parseFloat(res.data[0].lon),
+      [south, west],
+      [north, east],
     ];
   };
 
-  // 🚀 Fetch route
+  const getCurrentLocation = () =>
+    new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error("Geolocation is not supported in this browser."));
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          resolve([pos.coords.latitude, pos.coords.longitude]);
+        },
+        () => reject(new Error("Unable to get your current location.")),
+      );
+    });
+
+  const getPlaceDetails = async (place) => {
+    const trimmedPlace = place.trim();
+
+    if (!trimmedPlace) {
+      throw new Error("Please enter a location.");
+    }
+
+    if (trimmedPlace.toLowerCase() === "my location") {
+      const currentLocation = await getCurrentLocation();
+
+      return {
+        coordinates: currentLocation,
+        bounds: null,
+        geojson: null,
+        label: "My Location",
+      };
+    }
+
+    const res = await axios.get(
+      `https://nominatim.openstreetmap.org/search?format=json&polygon_geojson=1&q=${encodeURIComponent(trimmedPlace)}`,
+    );
+
+    if (!res.data?.length) {
+      throw new Error(`No results found for "${trimmedPlace}".`);
+    }
+
+    const result =
+      res.data.find(
+        (item) =>
+          item.geojson &&
+          (item.type === "administrative" ||
+            item.class === "boundary" ||
+            item.class === "place"),
+      ) ||
+      res.data.find((item) => item.geojson) ||
+      res.data.find((item) => item.boundingbox) ||
+      res.data[0];
+
+    return {
+      coordinates: [parseFloat(result.lat), parseFloat(result.lon)],
+      bounds: buildBounds(result.boundingbox),
+      geojson: result.geojson || null,
+      label: result.display_name || trimmedPlace,
+    };
+  };
+
+  const getCoordinates = async (place) => {
+    const details = await getPlaceDetails(place);
+    return details.coordinates;
+  };
+
   const fetchRoute = async () => {
     try {
       if (!from || !to) {
@@ -90,6 +155,7 @@ const MapView = () => {
 
       setStartPosition(start);
       setEndPosition(end);
+      setMapFocusPosition(start);
 
       const response = await getRoute([
         [start[1], start[0]],
@@ -103,164 +169,156 @@ const MapView = () => {
 
       const encoded = response.data.routes[0].geometry;
       const decoded = polyline.decode(encoded);
-
       const formatted = decoded.map(([lat, lng]) => [lat, lng]);
 
-      setRouteCoords(formatted);
-
+      setRouteCoords([...formatted]);
     } catch (error) {
       console.error("Routing error:", error);
+      alert(error.message || "Unable to fetch the route.");
     }
   };
 
-  // 🖱 Resize handling
+  const handleSearch = async (e) => {
+    e.preventDefault();
+
+    try {
+      setSearchLoading(true);
+
+      const placeDetails = await getPlaceDetails(searchQuery);
+
+      setSearchPosition(placeDetails.coordinates);
+      setSearchLabel(placeDetails.label);
+      setSearchBounds(placeDetails.bounds);
+      setSearchOutline(placeDetails.geojson);
+      setMapFocusPosition(placeDetails.coordinates);
+
+      localStorage.setItem(
+        LAST_SEARCH_STORAGE_KEY,
+        JSON.stringify(placeDetails),
+      );
+    } catch (error) {
+      console.error("Search error:", error);
+      alert(error.message || "Unable to find that location.");
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+
+  const handleDirectionsFromSearch = () => {
+    if (showSidebar) {
+      setShowSidebar(false);
+      return;
+    }
+
+    const destination = searchQuery.trim() || searchLabel;
+
+    setShowSidebar(true);
+    setFrom("My Location");
+
+    if (destination) {
+      setTo(destination);
+    }
+  };
+
   const handleMouseMove = (e) => {
     if (dragSidebar) {
       const width = e.clientX;
-      if (width > 220 && width < 500) setSidebarWidth(width);
+      if (width > 220 && width < 500) {
+        setSidebarWidth(width);
+      }
     }
 
     if (dragPanel) {
       const height = window.innerHeight - e.clientY;
-      if (height > 120 && height < 400) setPanelHeight(height);
+      if (height > 120 && height < 400) {
+        setPanelHeight(height);
+      }
     }
+  };
+
+  const handleMouseUp = () => {
+    setDragSidebar(false);
+    setDragPanel(false);
+  };
+
+  const handleSwapLocations = () => {
+    const temp = from;
+    setFrom(to);
+    setTo(temp);
+  };
+
+  const handleFilterToggle = (filterName) => {
+    setFilters((currentFilters) => ({
+      ...currentFilters,
+      [filterName]: !currentFilters[filterName],
+    }));
+  };
+
+  const handleClearFilters = () => {
+    setFilters({
+      safest: false,
+      pollution: false,
+      traffic: false,
+    });
   };
 
   return (
     <div
       className="map-container"
       onMouseMove={handleMouseMove}
-      onMouseUp={() => {
-        setDragSidebar(false);
-        setDragPanel(false);
-      }}
+      onMouseUp={handleMouseUp}
     >
-      {/* SIDEBAR */}
-      <div className="sidebar" style={{ width: sidebarWidth }}>
-        <div className="logo">
-          <h2>Smart<span>Maps</span></h2>
-          <p>Safe • Smart • Sustainable</p>
-        </div>
-
-        {/* ✅ FIXED FORM */}
-        <form
-          className="route-box"
-          onSubmit={(e) => {
-            e.preventDefault();
-            fetchRoute();
-          }}
-        >
-          <div className="input">
-            <label>From</label>
-            <input
-              value={from}
-              onChange={(e) => setFrom(e.target.value)}
-              placeholder="Enter starting location"
-            />
-          </div>
-
-          <div className="input">
-            <label>To</label>
-            <input
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-              placeholder="Enter destination"
-            />
-          </div>
-
-          <button type="submit" className="directions-btn">
-            Get Directions
-          </button>
-        </form>
-
-        {/* AI SECTION */}
-        <div className="ai-section">
-          <h4>Smart AI Assistant</h4>
-
-          <button
-            className="ai-btn"
-            onClick={() => alert("AI Suggestions Coming Soon 🚀")}
-          >
-            🤖 Ask SmartMaps AI
-          </button>
-        </div>
-      </div>
-
-      {/* Resize Handle */}
-      <div
-        className="resize-handle"
-        onMouseDown={() => setDragSidebar(true)}
+      <MapSidebar
+        fetchRoute={fetchRoute}
+        filters={filters}
+        from={from}
+        onClearFilters={handleClearFilters}
+        onFilterToggle={handleFilterToggle}
+        onSwapLocations={handleSwapLocations}
+        setFrom={setFrom}
+        setTo={setTo}
+        showSidebar={showSidebar}
+        sidebarWidth={sidebarWidth}
+        to={to}
       />
 
-      {/* MAP */}
+      {showSidebar && (
+        <div
+          className="resize-handle"
+          onMouseDown={() => setDragSidebar(true)}
+        />
+      )}
+
       <div className="map-area">
-        <MapContainer
-          center={startPosition}
-          zoom={12}
-          zoomControl={false}
-          className="leaflet-map"
-        >
-          <EnableZoom />
+        <MapSearchBar
+          onDirectionsClick={handleDirectionsFromSearch}
+          onSearch={handleSearch}
+          onSearchChange={setSearchQuery}
+          searchLoading={searchLoading}
+          searchQuery={searchQuery}
+          showSidebar={showSidebar}
+        />
 
-          <TileLayer
-            attribution="&copy; OpenStreetMap"
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
+        <MapCanvas
+          endPosition={endPosition}
+          mapFocusPosition={mapFocusPosition}
+          panelHeight={panelHeight}
+          routeCoords={routeCoords}
+          searchBounds={searchBounds}
+          searchLabel={searchLabel}
+          searchOutline={searchOutline}
+          searchPosition={searchPosition}
+          showSidebar={showSidebar}
+          startPosition={startPosition}
+        />
 
-          <Marker position={startPosition}>
-            <Popup>Start</Popup>
-          </Marker>
-
-          <Marker position={endPosition}>
-            <Popup>Destination</Popup>
-          </Marker>
-
-          {/* ✅ GREEN ROUTE */}
-          {routeCoords.length > 0 && (
-            <>
-              <Polyline
-                positions={routeCoords}
-                color="#2ecc71"
-                weight={10}
-                opacity={0.2}
-              />
-              <Polyline
-                positions={routeCoords}
-                color={routes[selectedRoute].color}
-                weight={6}
-              />
-            </>
-          )}
-        </MapContainer>
-
-        {/* BOTTOM PANEL */}
-        <div className="bottom-panel" style={{ height: panelHeight }}>
-          <div
-            className="panel-resize-handle"
-            onMouseDown={() => setDragPanel(true)}
-          />
-
-          <div className="bottom-panel-content">
-            <h3>Recommended Routes</h3>
-
-            <div className="cards">
-              {routes.map((r, i) => (
-                <div
-                  key={i}
-                  className={`card ${selectedRoute === i ? "active" : ""}`}
-                  onClick={() => setSelectedRoute(i)}
-                >
-                  <h4>{r.type}</h4>
-                </div>
-              ))}
-            </div>
-
-            <div className="bottom-actions">
-              <button className="filter-btn">Filters</button>
-              <button className="start-btn">Start Navigation</button>
-            </div>
-          </div>
-        </div>
+        <MapBottomPanel
+          mode={mode}
+          onModeChange={setMode}
+          onResizeStart={() => setDragPanel(true)}
+          panelHeight={panelHeight}
+          showSidebar={showSidebar}
+        />
       </div>
     </div>
   );
