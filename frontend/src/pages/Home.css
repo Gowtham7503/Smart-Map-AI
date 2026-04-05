@@ -1,0 +1,474 @@
+/* =========================
+   RESET
+========================= */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  min-height: 100%;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* =========================
+   THEME VARIABLES
+========================= */
+body[data-theme="dark"] {
+  --bg-main: #050b16;
+  --bg-secondary: #081325;
+  --text-main: #ffffff;
+  --text-muted: #c8d1df;
+  --nav-text: #f5f5f5;
+  --accent: #00f7a5;
+  --button-bg: #ffffff;
+  --button-text: #111111;
+  --box-bg: rgba(16, 22, 34, 0.82);
+  --box-border: rgba(255, 255, 255, 0.1);
+
+  --map-filter: brightness(1.2) contrast(1.35) saturate(1.8)
+    drop-shadow(0 0 30px rgba(0, 200, 255, 0.22))
+    drop-shadow(0 0 70px rgba(0, 180, 255, 0.15));
+
+  --map-opacity: 0.95;
+
+  --line-color: rgba(80, 180, 255, 0.16);
+  --grid-color: rgba(80, 180, 255, 0.05);
+  --node-color: #58d5ff;
+  --glow-1: rgba(0, 200, 255, 0.2);
+  --glow-2: rgba(0, 120, 255, 0.16);
+  --overlay-dark: rgba(0, 0, 0, 0.22);
+}
+
+body[data-theme="light"] {
+  --bg-main: #d8e1e8;
+  --bg-secondary: #edf3f7;
+  --text-main: #000000;
+  --text-muted: rgba(0, 0, 0, 0.9);
+  --nav-text: #000000;
+  --accent: #00f7a5;
+  --button-bg: #ffffff;
+  --button-text: #111111;
+  --box-bg: rgba(31, 38, 52, 0.82);
+  --box-border: rgba(255, 255, 255, 0.12);
+
+  --map-filter: brightness(0.82) contrast(1.12) saturate(1.15)
+    drop-shadow(0 0 22px rgba(0, 140, 255, 0.16))
+    drop-shadow(0 0 38px rgba(0, 180, 255, 0.1));
+
+  --map-opacity: 0.96;
+
+  --line-color: rgba(255, 255, 255, 0.62);
+  --grid-color: rgba(255, 255, 255, 0.14);
+  --node-color: #ffffff;
+  --glow-1: rgba(0, 145, 255, 0.16);
+  --glow-2: rgba(255, 255, 255, 0.24);
+  --overlay-dark: rgba(0, 0, 0, 0.06);
+}
+
+body[data-theme="dark"] .hero-content h1 {
+  color: white;
+}
+
+/* LIGHT THEME */
+body[data-theme="light"] .hero-content h1 {
+  color: #111111;
+}
+
+/* =========================
+   BODY
+========================= */
+body {
+  background: var(--bg-main);
+  transition: background 0.4s ease;
+}
+
+.app {
+  width: 100%;
+  min-height: 100vh;
+  overflow: hidden;
+  position: relative;
+}
+
+/* =========================
+   NAVBAR
+========================= */
+.navbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 20;
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 28px 64px;
+}
+
+.logo {
+  font-size: 2.4rem;
+  font-weight: 800;
+  color: var(--text-main);
+}
+
+.logo span {
+  color: var(--accent);
+}
+
+.nav-links {
+  display: flex;
+  gap: 42px;
+}
+
+.nav-links a {
+  text-decoration: none;
+  color: var(--nav-text);
+  font-size: 1.45rem;
+  font-weight: 500;
+  transition: 0.3s ease;
+}
+
+.nav-links a:hover {
+  color: var(--accent);
+}
+
+.theme-toggle {
+  margin-left: 24px;
+  padding: 12px 18px;
+  border: 1px solid var(--box-border);
+  border-radius: 999px;
+  background: var(--box-bg);
+  color: white;
+  cursor: pointer;
+  font-weight: 600;
+  backdrop-filter: blur(12px);
+}
+
+/* =========================
+   HERO SECTION
+========================= */
+.hero-section {
+  position: relative;
+  width: 100%;
+  min-height: 100vh;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  padding: 120px 80px 60px;
+}
+
+/* =========================
+   BACKGROUND LAYERS
+========================= */
+.background-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 50%, var(--bg-secondary) 0%, var(--bg-main) 100%);
+}
+
+.bg-gradient {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 20% 25%, var(--glow-1), transparent 26%),
+    radial-gradient(circle at 78% 28%, var(--glow-1), transparent 24%),
+    radial-gradient(circle at 50% 60%, var(--glow-2), transparent 30%),
+    radial-gradient(circle at 50% 50%, transparent 30%, var(--overlay-dark) 100%);
+  filter: blur(18px);
+  opacity: 1;
+}
+
+/* subtle grid */
+.bg-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(var(--grid-color) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+  background-size: 70px 70px;
+  opacity: 0.25;
+}
+
+/* noise effect */
+.bg-noise {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle, rgba(255,255,255,0.02) 1px, transparent 1px);
+  background-size: 8px 8px;
+  opacity: 0.08;
+}
+
+/* =========================
+   MAP
+========================= */
+.map-container {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.world-map-svg {
+  width: 88%;
+  max-width: 1450px;
+  opacity: var(--map-opacity);
+  filter: var(--map-filter);
+  z-index: 2;
+  transform: translateY(10px) scale(1.02);
+}
+
+/* IMPORTANT:
+   this styles internal SVG paths */
+.world-map-svg {
+  width: 88%;
+  max-width: 1450px;
+  opacity: var(--map-opacity);
+  filter: var(--map-filter);
+  z-index: 2;
+  transform: translateY(10px) scale(1.02);
+  user-select: none;
+  pointer-events: none;
+  transition: filter 0.4s ease, opacity 0.4s ease, transform 0.4s ease;
+}
+/* =========================
+   REAL CONNECTION SVG
+========================= */
+.connection-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.arc {
+  fill: none;
+  stroke: var(--line-color);
+  stroke-width: 1.8;
+  opacity: 0.95;
+  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.15));
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Dark theme arc glow */
+body[data-theme="dark"] .arc {
+  stroke: rgba(95, 195, 255, 0.35);
+  filter: drop-shadow(0 0 6px rgba(0, 180, 255, 0.3));
+}
+
+/* Light theme arc visibility */
+body[data-theme="light"] .arc {
+  stroke: rgba(255, 255, 255, 0.78);
+  filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.28));
+}
+
+/* =========================
+   NETWORK LINES EFFECT
+========================= */
+.network-lines {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  opacity: 0.7;
+  background:
+    linear-gradient(25deg, transparent 48%, var(--line-color) 49%, transparent 50%),
+    linear-gradient(65deg, transparent 48%, var(--line-color) 49%, transparent 50%),
+    linear-gradient(115deg, transparent 48%, var(--line-color) 49%, transparent 50%),
+    linear-gradient(155deg, transparent 48%, var(--line-color) 49%, transparent 50%);
+  background-size: 280px 280px;
+  filter: blur(0.3px);
+  mask-image: radial-gradient(circle at center, black 45%, transparent 100%);
+  -webkit-mask-image: radial-gradient(circle at center, black 45%, transparent 100%);
+}
+
+/* =========================
+   GLOW NODES
+========================= */
+/* .node {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: var(--node-color);
+  border-radius: 50%;
+  z-index: 5;
+  box-shadow:
+    0 0 8px var(--node-color),
+    0 0 18px var(--node-color),
+    0 0 40px rgba(0, 180, 255, 0.35);
+  animation: pulse 2.5s infinite ease-in-out;
+}
+
+.node::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 50%;
+} */
+
+/* stronger dark theme nodes */
+body[data-theme="dark"] .node {
+  background: #58d5ff;
+  box-shadow:
+    0 0 10px #58d5ff,
+    0 0 22px #58d5ff,
+    0 0 48px rgba(0, 180, 255, 0.45);
+}
+
+/* stronger visible light theme nodes */
+body[data-theme="light"] .node {
+  background: #ffffff;
+  box-shadow:
+    0 0 8px rgba(255, 255, 255, 1),
+    0 0 18px rgba(255, 255, 255, 0.95),
+    0 0 30px rgba(120, 200, 255, 0.28);
+}
+
+
+/* =========================
+   HERO CONTENT
+========================= */
+.hero-content {
+  position: relative;
+  z-index: 10;
+  max-width: 720px;
+  padding-left: 20px;
+}
+
+.section-tag {
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 1rem;
+  letter-spacing: 4px;
+  margin-bottom: 24px;
+  font-weight: 600;
+}
+
+.hero-content h1 {
+  font-size: clamp(3rem, 5vw, 5.2rem);
+  line-height: 1.06;
+  font-weight: 800;
+  letter-spacing: -2px;
+  color: white;
+  transition: color 0.3s ease;
+}
+
+.hero-content h1 span {
+  color: var(--accent);
+}
+
+.hero-description {
+  margin-top: 28px;
+  max-width: 720px;
+  font-size: 1.15rem;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+.explore-btn {
+  margin-top: 34px;
+  background: var(--button-bg);
+  color: var(--button-text);
+  border: none;
+  padding: 18px 30px;
+  border-radius: 999px;
+  font-size: 1.15rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  transition: 0.3s ease;
+}
+
+.explore-btn:hover {
+  transform: translateY(-3px);
+}
+
+/* =========================
+   RESPONSIVE
+========================= */
+@media (max-width: 1200px) {
+  .navbar {
+    padding: 24px 38px;
+  }
+
+  .hero-section {
+    padding: 130px 40px 60px;
+  }
+
+  .nav-links {
+    gap: 28px;
+  }
+
+  .nav-links a {
+    font-size: 1.15rem;
+  }
+
+  .logo {
+    font-size: 2rem;
+  }
+}
+
+@media (max-width: 900px) {
+  .navbar {
+    flex-wrap: wrap;
+    gap: 18px;
+  }
+
+  .nav-links {
+    gap: 18px;
+    flex-wrap: wrap;
+  }
+
+  .hero-content h1 {
+    font-size: clamp(2.7rem, 7vw, 4.2rem);
+  }
+
+  .hero-description {
+    font-size: 1rem;
+  }
+
+  .world-map-svg {
+    width: 120%;
+  }
+}
+
+@media (max-width: 600px) {
+  .navbar {
+    padding: 18px 20px;
+  }
+
+  .hero-section {
+    padding: 150px 20px 40px;
+  }
+
+  .hero-content {
+    padding-left: 0;
+  }
+
+  .hero-content h1 {
+    line-height: 1.08;
+    letter-spacing: -1px;
+  }
+
+  .explore-btn {
+    padding: 16px 24px;
+    font-size: 1rem;
+  }
+
+  .world-map-svg {
+    width: 150%;
+    opacity: 0.8;
+  }
+}
