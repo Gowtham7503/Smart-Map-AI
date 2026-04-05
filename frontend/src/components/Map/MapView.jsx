@@ -184,11 +184,23 @@ const MapView = () => {
     }
   };
 
+  const clearRoutePreview = () => {
+    setRouteCoords([]);
+    setStartPosition(null);
+    setEndPosition(null);
+  };
+
   const handleSearch = async (e) => {
     e.preventDefault();
 
     try {
       setSearchLoading(true);
+      clearRoutePreview();
+      setHoveredPlace(null);
+      setSelectedPlace(null);
+      setSelectedPlacePosition(null);
+      setPlaceDetailsError("");
+      setPlaceDetailsLoading(false);
 
       const placeDetails = await getPlaceDetails(searchQuery);
 
@@ -198,6 +210,9 @@ const MapView = () => {
       setSearchOutline(placeDetails.geojson);
       setMapFocusPosition(placeDetails.coordinates);
       setSelectedPlacePosition(placeDetails.coordinates);
+      setShowSidebar(false);
+      setFrom("");
+      setTo("");
 
       localStorage.setItem(
         LAST_SEARCH_STORAGE_KEY,

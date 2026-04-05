@@ -1,5 +1,6 @@
 from flask import Blueprint, jsonify, request
 import os
+from urllib.parse import quote
 
 from dotenv import load_dotenv
 import requests
@@ -13,6 +14,10 @@ api = Blueprint("api", __name__)
 
 ORS_API_KEY = os.getenv("ORS_API_KEY")
 UNSPLASH_API_KEY = (os.getenv("UNSPLASH_API_KEY") or os.getenv("UNSPLASH_ACCESS_KEY") or "").strip()
+WIKIPEDIA_HEADERS = {
+    "User-Agent": "smartmap/1.0 (place details lookup)",
+    "Accept": "application/json",
+}
 
 
 @api.route("/route", methods=["POST"])
@@ -120,40 +125,85 @@ def get_place_details():
 
     try:
         clean_query = query.split(",")[0].strip()
-        smart_query = f"{clean_query} city"
 
-        print("Unsplash Query:", smart_query)
+        # 🔥 1. Wikipedia API
+        description = f"{clean_query} is a place."
+        wiki_image = None
+        wiki_link = None
+        wiki_title = clean_query
+        wiki_url = (
+            "https://en.wikipedia.org/api/rest_v1/page/summary/"
+            f"{quote(wiki_title, safe='')}"
+        )
+        wiki_res = requests.get(wiki_url, headers=WIKIPEDIA_HEADERS, timeout=10)
 
-        response = requests.get(
+        if wiki_res.status_code != 200:
+            search_res = requests.get(
+                "https://en.wikipedia.org/w/api.php",
+                params={
+                    "action": "query",
+                    "list": "search",
+                    "srsearch": clean_query,
+                    "format": "json",
+                    "utf8": 1,
+                },
+                headers=WIKIPEDIA_HEADERS,
+                timeout=10,
+            )
+            search_res.raise_for_status()
+            search_results = search_res.json().get("query", {}).get("search", [])
+
+            if search_results:
+                wiki_title = search_results[0].get("title", clean_query)
+                wiki_url = (
+                    "https://en.wikipedia.org/api/rest_v1/page/summary/"
+                    f"{quote(wiki_title, safe='')}"
+                )
+                wiki_res = requests.get(
+                    wiki_url, headers=WIKIPEDIA_HEADERS, timeout=10
+                )
+
+        if wiki_res.status_code == 200:
+            wiki_data = wiki_res.json()
+            description = wiki_data.get("extract", description)
+            wiki_image = wiki_data.get("thumbnail", {}).get("source")
+            wiki_link = (
+                wiki_data.get("content_urls", {})
+                .get("desktop", {})
+                .get("page")
+            )
+
+        # 🔥 2. Unsplash Images
+        unsplash_res = requests.get(
             "https://api.unsplash.com/search/photos",
             params={
-                "query": smart_query,
+                "query": f"{clean_query} city",
                 "per_page": 6,
                 "orientation": "landscape",
                 "client_id": UNSPLASH_API_KEY,
             },
             timeout=20,
         )
-        response.raise_for_status()
-        data = response.json()
+
+        unsplash_res.raise_for_status()
+        unsplash_data = unsplash_res.json()
 
         images = [
-            image["urls"]["regular"]
-            for image in data.get("results", [])
+            img["urls"]["regular"]
+            for img in unsplash_data.get("results", [])
         ]
 
-        return jsonify(
-            {
-                "name": clean_query,
-                "description": f"{clean_query} is a popular place.",
-                "images": images,
-            }
-        )
+        # 🔥 Add Wikipedia image at first (if exists)
+        if wiki_image:
+            images.insert(0, wiki_image)
+
+        return jsonify({
+            "name": clean_query,
+            "description": description,
+            "images": images,
+            "wiki_link": wiki_link
+        })
+
     except requests.RequestException as error:
-        if error.response is not None:
-            print("Status:", error.response.status_code)
-            print("Response:", error.response.text)
-
-        print("Unsplash API Error:", error)
-
+        print("API Error:", error)
         return jsonify({"error": "Unable to fetch place details"}), 502
