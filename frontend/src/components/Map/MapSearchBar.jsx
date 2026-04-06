@@ -2,10 +2,49 @@ const MapSearchBar = ({
   onDirectionsClick,
   onSearch,
   onSearchChange,
+  onVoiceSearch,
   searchLoading,
   searchQuery,
   showSidebar,
 }) => {
+  const handleVoiceSearch = () => {
+    const SpeechRecognition =
+      window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      alert("Voice search is not supported in your browser");
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = "en-IN";
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => {
+      console.log("Voice recognition started...");
+    };
+
+    recognition.onresult = async (event) => {
+      const transcript = event.results?.[0]?.[0]?.transcript?.trim();
+
+      if (!transcript) {
+        return;
+      }
+
+      console.log("You said:", transcript);
+      onSearchChange(transcript);
+      await onVoiceSearch(transcript);
+    };
+
+    recognition.onerror = (event) => {
+      console.error("Voice error:", event.error);
+      alert("Voice recognition error");
+    };
+
+    recognition.start();
+  };
+
   return (
     <div className={`search-bar ${!showSidebar ? "top-left" : ""}`}>
       <form className="search-box" onSubmit={onSearch}>
@@ -42,7 +81,13 @@ const MapSearchBar = ({
           placeholder="Search location, place..."
         />
 
-        <span className="mic-icon">
+        <button
+          type="button"
+          className="mic-icon"
+          onClick={handleVoiceSearch}
+          aria-label="Voice search"
+          disabled={searchLoading}
+        >
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none">
             <rect
               x="9"
@@ -68,7 +113,7 @@ const MapSearchBar = ({
               strokeWidth="2"
             />
           </svg>
-        </span>
+        </button>
 
         <button
           type="button"

@@ -11,6 +11,25 @@ import MapSidebar from "./MapSidebar";
 
 const defaultCenter = [17.4948, 78.3996];
 const LAST_SEARCH_STORAGE_KEY = "smartmap:last-search";
+const TRAVEL_MODES = ["car", "bike", "walk"];
+
+const parseRouteDetails = (routeResponse) => {
+  const route = routeResponse?.routes?.[0];
+
+  if (!route?.geometry) {
+    throw new Error("Route data is unavailable for this travel mode.");
+  }
+
+  const decoded = polyline.decode(route.geometry);
+
+  return {
+    coords: decoded.map(([lat, lng]) => [lat, lng]),
+    summary: {
+      distanceKm: (route.summary?.distance || 0) / 1000,
+      durationMinutes: (route.summary?.duration || 0) / 60,
+    },
+  };
+};
 
 const getSavedSearch = () => {
   try {
@@ -42,6 +61,17 @@ const MapView = () => {
   const [dragSidebar, setDragSidebar] = useState(false);
   const [dragPanel, setDragPanel] = useState(false);
   const [routeCoords, setRouteCoords] = useState([]);
+  const [routeSummaries, setRouteSummaries] = useState({
+    car: null,
+    bike: null,
+    walk: null,
+  });
+  const [routeDataByMode, setRouteDataByMode] = useState({
+    car: null,
+    bike: null,
+    walk: null,
+  });
+  const [routeLoading, setRouteLoading] = useState(false);
   const [mode, setMode] = useState("car");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -149,12 +179,14 @@ const MapView = () => {
     return details.coordinates;
   };
 
-  const fetchRoute = async () => {
+  const fetchRoute = async (preferredMode = mode) => {
     try {
       if (!from || !to) {
         alert("Please enter both locations");
         return;
       }
+
+      setRouteLoading(true);
 
       const start = await getCoordinates(from);
       const end = await getCoordinates(to);
@@ -163,37 +195,88 @@ const MapView = () => {
       setEndPosition(end);
       setMapFocusPosition(start);
 
-      const response = await getRoute([
+      const coordinates = [
         [start[1], start[0]],
         [end[1], end[0]],
-      ]);
+      ];
+      const routeResponses = await Promise.allSettled(
+        TRAVEL_MODES.map(async (travelMode) => {
+          const response = await getRoute(coordinates, travelMode);
 
-      if (!response.data || !response.data.routes) {
-        console.error("Invalid response:", response.data);
-        return;
+          return {
+            mode: travelMode,
+            ...parseRouteDetails(response.data),
+          };
+        }),
+      );
+
+      const nextRouteDataByMode = {
+        car: null,
+        bike: null,
+        walk: null,
+      };
+      const nextRouteSummaries = {
+        car: null,
+        bike: null,
+        walk: null,
+      };
+
+      routeResponses.forEach((result) => {
+        if (result.status !== "fulfilled") {
+          return;
+        }
+
+        nextRouteDataByMode[result.value.mode] = result.value.coords;
+        nextRouteSummaries[result.value.mode] = result.value.summary;
+      });
+
+      const activeRoute =
+        nextRouteDataByMode[preferredMode] ||
+        nextRouteDataByMode.car ||
+        nextRouteDataByMode.bike ||
+        nextRouteDataByMode.walk;
+
+      if (!activeRoute) {
+        throw new Error("Unable to fetch route details for any travel mode.");
       }
 
-      const encoded = response.data.routes[0].geometry;
-      const decoded = polyline.decode(encoded);
-      const formatted = decoded.map(([lat, lng]) => [lat, lng]);
-
-      setRouteCoords([...formatted]);
+      setRouteDataByMode(nextRouteDataByMode);
+      setRouteSummaries(nextRouteSummaries);
+      setRouteCoords(activeRoute);
     } catch (error) {
       console.error("Routing error:", error);
       alert(error.message || "Unable to fetch the route.");
+      clearRoutePreview();
+    } finally {
+      setRouteLoading(false);
     }
   };
 
   const clearRoutePreview = () => {
     setRouteCoords([]);
+    setRouteSummaries({
+      car: null,
+      bike: null,
+      walk: null,
+    });
+    setRouteDataByMode({
+      car: null,
+      bike: null,
+      walk: null,
+    });
+    setRouteLoading(false);
     setStartPosition(null);
     setEndPosition(null);
   };
 
-  const handleSearch = async (e) => {
-    e.preventDefault();
-
+  const runSearch = async (query) => {
     try {
+      const trimmedQuery = query.trim();
+
+      if (!trimmedQuery) {
+        throw new Error("Please enter a location.");
+      }
+
       setSearchLoading(true);
       clearRoutePreview();
       setHoveredPlace(null);
@@ -202,9 +285,10 @@ const MapView = () => {
       setPlaceDetailsError("");
       setPlaceDetailsLoading(false);
 
-      const placeDetails = await getPlaceDetails(searchQuery);
+      const placeDetails = await getPlaceDetails(trimmedQuery);
 
       setSearchPosition(placeDetails.coordinates);
+      setSearchQuery(trimmedQuery);
       setSearchLabel(placeDetails.label);
       setSearchBounds(placeDetails.bounds);
       setSearchOutline(placeDetails.geojson);
@@ -246,6 +330,16 @@ const MapView = () => {
     } finally {
       setSearchLoading(false);
     }
+  };
+
+  const handleSearch = async (e) => {
+    e.preventDefault();
+    await runSearch(searchQuery);
+  };
+
+  const handleVoiceSearch = async (query) => {
+    setSearchQuery(query);
+    await runSearch(query);
   };
 
   const handleDirectionsFromSearch = () => {
@@ -294,6 +388,14 @@ const MapView = () => {
     const temp = from;
     setFrom(to);
     setTo(temp);
+  };
+
+  const handleModeChange = (nextMode) => {
+    setMode(nextMode);
+
+    if (routeDataByMode[nextMode]) {
+      setRouteCoords(routeDataByMode[nextMode]);
+    }
   };
 
   const handleFilterToggle = (filterName) => {
@@ -376,6 +478,7 @@ const MapView = () => {
           onDirectionsClick={handleDirectionsFromSearch}
           onSearch={handleSearch}
           onSearchChange={setSearchQuery}
+          onVoiceSearch={handleVoiceSearch}
           searchLoading={searchLoading}
           searchQuery={searchQuery}
           showSidebar={showSidebar}
@@ -414,10 +517,12 @@ const MapView = () => {
 
         <MapBottomPanel
           mode={mode}
-          onModeChange={setMode}
+          onModeChange={handleModeChange}
           onResizeStart={() => setDragPanel(true)}
           panelHeight={panelHeight}
           place={selectedPlace}
+          routeLoading={routeLoading}
+          routeSummaries={routeSummaries}
           showSidebar={showSidebar}
         />
       </div>
