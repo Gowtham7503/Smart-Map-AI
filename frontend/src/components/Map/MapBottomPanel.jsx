@@ -1,7 +1,60 @@
-const MapBottomPanel = ({ mode, onModeChange, onResizeStart, panelHeight, place, showSidebar }) => {
+const formatDuration = (minutes) => {
+  if (minutes == null) {
+    return "--";
+  }
+
+  if (minutes >= 1440) {
+    const days = Math.floor(minutes / 1440);
+    const remainingHours = Math.floor((minutes % 1440) / 60);
+
+    if (!remainingHours) {
+      return `${days} day${days === 1 ? "" : "s"}`;
+    }
+
+    return `${days} day${days === 1 ? "" : "s"} ${remainingHours} hr`;
+  }
+
+  if (minutes < 60) {
+    return `${Math.round(minutes)} min`;
+  }
+
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = Math.round(minutes % 60);
+
+  if (!remainingMinutes) {
+    return `${hours} hr`;
+  }
+
+  return `${hours} hr ${remainingMinutes} min`;
+};
+
+const formatDistance = (kilometers) => {
+  if (kilometers == null) {
+    return "--";
+  }
+
+  if (kilometers < 1) {
+    return `${Math.round(kilometers * 1000)} m`;
+  }
+
+  return `${kilometers.toFixed(1)} km`;
+};
+
+const MapBottomPanel = ({
+  mode,
+  onModeChange,
+  onResizeStart,
+  panelHeight,
+  place,
+  routeLoading,
+  routeSummaries,
+  showSidebar,
+}) => {
   if (!showSidebar || place) {
     return null;
   }
+
+  const activeSummary = routeSummaries[mode] || null;
 
   return (
     <div
@@ -33,7 +86,10 @@ const MapBottomPanel = ({ mode, onModeChange, onResizeStart, panelHeight, place,
             <circle cx="4" cy="10" r="1" className="car-wheel" />
             <circle cx="12" cy="10" r="1" className="car-wheel" />
           </svg>
-          <span>Car</span>
+          <div className="vehicle-btn-copy">
+            <span>Car</span>
+            <small>{formatDuration(routeSummaries.car?.durationMinutes)}</small>
+          </div>
         </div>
 
         <div
@@ -89,7 +145,10 @@ const MapBottomPanel = ({ mode, onModeChange, onResizeStart, panelHeight, place,
               C302.217,284.998,318.199,253.272,343.302,232.111z"
             />
           </svg>
-          <span>Bike</span>
+          <div className="vehicle-btn-copy">
+            <span>Bike</span>
+            <small>{formatDuration(routeSummaries.bike?.durationMinutes)}</small>
+          </div>
         </div>
 
         <div
@@ -135,7 +194,22 @@ const MapBottomPanel = ({ mode, onModeChange, onResizeStart, panelHeight, place,
               strokeLinejoin="round"
             />
           </svg>
-          <span>Walk</span>
+          <div className="vehicle-btn-copy">
+            <span>Walk</span>
+            <small>{formatDuration(routeSummaries.walk?.durationMinutes)}</small>
+          </div>
+        </div>
+      </div>
+
+      <div className="route-summary-card">
+        <div>
+          <p className="route-summary-label">Estimated time</p>
+          <strong>{routeLoading ? "Calculating..." : formatDuration(activeSummary?.durationMinutes)}</strong>
+        </div>
+
+        <div>
+          <p className="route-summary-label">Distance</p>
+          <strong>{routeLoading ? "Calculating..." : formatDistance(activeSummary?.distanceKm)}</strong>
         </div>
       </div>
     </div>

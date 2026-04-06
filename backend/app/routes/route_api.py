@@ -14,6 +14,11 @@ api = Blueprint("api", __name__)
 
 ORS_API_KEY = os.getenv("ORS_API_KEY")
 UNSPLASH_API_KEY = (os.getenv("UNSPLASH_API_KEY") or os.getenv("UNSPLASH_ACCESS_KEY") or "").strip()
+ORS_PROFILES = {
+    "car": "driving-car",
+    "bike": "cycling-regular",
+    "walk": "foot-walking",
+}
 WIKIPEDIA_HEADERS = {
     "User-Agent": "smartmap/1.0 (place details lookup)",
     "Accept": "application/json",
@@ -24,6 +29,7 @@ WIKIPEDIA_HEADERS = {
 def get_route():
     data = request.get_json(silent=True) or {}
     coordinates = data.get("coordinates")
+    mode = (data.get("mode") or "car").strip().lower()
 
     if not ORS_API_KEY:
         return jsonify({"error": "API key not loaded"}), 500
@@ -31,9 +37,14 @@ def get_route():
     if not coordinates:
         return jsonify({"error": "Coordinates are required"}), 400
 
+    profile = ORS_PROFILES.get(mode)
+
+    if not profile:
+        return jsonify({"error": "Unsupported travel mode"}), 400
+
     try:
         response = requests.post(
-            "https://api.openrouteservice.org/v2/directions/driving-car",
+            f"https://api.openrouteservice.org/v2/directions/{profile}",
             json={"coordinates": coordinates},
             headers={
                 "Authorization": ORS_API_KEY,
