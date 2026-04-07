@@ -8,6 +8,7 @@ import PlaceHoverCard from "./PlaceHoverCard";
 import "./Map.css";
 import MapSearchBar from "./MapSearchBar";
 import MapSidebar from "./MapSidebar";
+import Chatbot from "../Chatbot/Chatbot";
 
 const defaultCenter = [17.4948, 78.3996];
 const LAST_SEARCH_STORAGE_KEY = "smartmap:last-search";
@@ -95,6 +96,7 @@ const MapView = () => {
   const [selectedPlacePosition, setSelectedPlacePosition] = useState(null);
   const [placeDetailsLoading, setPlaceDetailsLoading] = useState(false);
   const [placeDetailsError, setPlaceDetailsError] = useState("");
+  const [showChatbot, setShowChatbot] = useState(false);
   const [filters, setFilters] = useState({
     safest: true,
     pollution: false,
@@ -488,6 +490,7 @@ const MapView = () => {
           endPosition={endPosition}
           handlePlaceClick={handlePlaceClick}
           mapFocusPosition={mapFocusPosition}
+          onOpenChatbot={() => setShowChatbot(true)}
           panelHeight={panelHeight}
           routeCoords={routeCoords}
           searchBounds={searchBounds}
@@ -498,6 +501,8 @@ const MapView = () => {
           showSidebar={showSidebar}
           startPosition={startPosition}
         />
+
+        {showChatbot && <Chatbot onClose={() => setShowChatbot(false)} />}
 
         {hoveredPlace && !selectedPlace && (
           <PlaceHoverCard

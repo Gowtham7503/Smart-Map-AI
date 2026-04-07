@@ -1,17 +1,23 @@
-smartmaps/
+﻿smartmap/
 ├── frontend/                     # React + Vite app
 │   ├── public/
 │   │   ├── favicon.svg
 │   │   └── icons.svg
 │   ├── src/
+│   │   ├── assets/
+│   │   │   └── mapbright.png
 │   │   ├── components/
+│   │   │   ├── Chatbot/
+│   │   │   │   ├── Chatbot.css
+│   │   │   │   └── Chatbot.jsx
 │   │   │   ├── Map/
 │   │   │   │   ├── MapBottomPanel.jsx
 │   │   │   │   ├── MapCanvas.jsx
 │   │   │   │   ├── Map.css
 │   │   │   │   ├── MapSearchBar.jsx
 │   │   │   │   ├── MapSidebar.jsx
-│   │   │   │   └── MapView.jsx
+│   │   │   │   ├── MapView.jsx
+│   │   │   │   └── PlaceHoverCard.jsx
 │   │   │   ├── Route/
 │   │   │   │   ├── Route.css
 │   │   │   │   └── RouteForm.jsx
@@ -21,6 +27,7 @@ smartmaps/
 │   │   │       └── Loader.jsx
 │   │   ├── pages/
 │   │   │   ├── Dashboard.jsx
+│   │   │   ├── Home.css
 │   │   │   └── Home.jsx
 │   │   ├── services/
 │   │   │   └── api.js
