@@ -33,7 +33,7 @@ const EnableZoom = () => {
   return null;
 };
 
-const MapControls = ({ bottomOffset }) => {
+const MapControls = ({ bottomOffset, onOpenChatbot }) => {
   const map = useMap();
 
   const handleLocate = () => {
@@ -48,7 +48,37 @@ const MapControls = ({ bottomOffset }) => {
   return (
     <>
       <div className="map-controls">
-        <button className="map-btn">
+        <button
+          className="map-btn chatbot-btn"
+          onClick={onOpenChatbot}
+          type="button"
+          aria-label="Open chatbot"
+        >
+          <svg viewBox="0 0 24 24" width="32" height="32" fill="none">
+            <defs>
+              <linearGradient id="chatbotIconGradient" x1="4" y1="6" x2="20" y2="20" gradientUnits="userSpaceOnUse">
+                <stop stopColor="#60A5FA" />
+                <stop offset="0.5" stopColor="#A78BFA" />
+                <stop offset="1" stopColor="#34D399" />
+              </linearGradient>
+            </defs>
+            <path
+              d="M8 18.5c-2.761 0-5-2.015-5-4.5s2.239-4.5 5-4.5h8c2.761 0 5 2.015 5 4.5s-2.239 4.5-5 4.5h-4.5L8 21v-2.5z"
+              stroke="url(#chatbotIconGradient)"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <path
+              d="M9 13h.01M12 13h.01M15 13h.01"
+              stroke="url(#chatbotIconGradient)"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+            />
+          </svg>
+        </button>
+
+        <button className="map-btn" type="button" aria-label="Map filters">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none">
             <path
               d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2V6z"
@@ -121,6 +151,7 @@ const MapCanvas = ({
   endPosition,
   handlePlaceClick,
   mapFocusPosition,
+  onOpenChatbot,
   panelHeight,
   routeCoords,
   searchBounds,
@@ -152,7 +183,10 @@ const MapCanvas = ({
       className="leaflet-map"
     >
       <EnableZoom />
-      <MapControls bottomOffset={showSidebar ? panelHeight : 0} />
+      <MapControls
+        bottomOffset={showSidebar ? panelHeight : 0}
+        onOpenChatbot={onOpenChatbot}
+      />
       <MapViewportController
         focusPosition={mapFocusPosition}
         routeCoords={routeCoords}

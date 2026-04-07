@@ -661,6 +661,8 @@
   position: absolute;
   top: 20px;
   right: 20px;
+  display: flex;
+  gap: 10px;
   z-index: 1000;
 }
 
@@ -677,6 +679,17 @@
 }
 
 .map-btn:hover {
+  transform: scale(1.05);
+}
+
+.chatbot-btn {
+  border: 1px solid rgba(96, 165, 250, 0.35);
+  background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 52%, #064e3b 100%);
+  color: #ffffff;
+}
+
+.chatbot-btn:hover {
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.28);
   transform: scale(1.05);
 }
 
