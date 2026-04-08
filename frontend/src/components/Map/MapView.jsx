@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import polyline from "polyline";
 import axios from "axios";
 import { getRoute } from "../../services/api";
@@ -14,6 +14,14 @@ const defaultCenter = [17.4948, 78.3996];
 const LAST_SEARCH_STORAGE_KEY = "smartmap:last-search";
 const TRAVEL_MODES = ["car", "bike", "walk"];
 
+const geocodePlaceWithNominatim = async (place) => {
+  const res = await axios.get(
+    `https://nominatim.openstreetmap.org/search?format=json&polygon_geojson=1&q=${encodeURIComponent(place)}`,
+  );
+
+  return res.data;
+};
+
 const parseRouteDetails = (routeResponse) => {
   const route = routeResponse?.routes?.[0];
 
@@ -28,6 +36,22 @@ const parseRouteDetails = (routeResponse) => {
     summary: {
       distanceKm: (route.summary?.distance || 0) / 1000,
       durationMinutes: (route.summary?.duration || 0) / 60,
+      safetyScore:
+        route.safety_score == null ? null : Number(route.safety_score),
+      safetyContext: route.safety_context || null,
+      routeSelection: {
+        selectedForSafety: Boolean(route.selected_for_safety),
+        selectionReason: route.selection_reason || null,
+        alternativesReturned:
+          routeResponse?.metadata?.alternatives_returned ?? null,
+        safestRouteEnabled: Boolean(
+          routeResponse?.metadata?.safest_route_enabled,
+        ),
+        safestRouteFallback:
+          routeResponse?.metadata?.safest_route_fallback || null,
+        selectedRouteStrategy:
+          routeResponse?.metadata?.selected_route_strategy || null,
+      },
     },
   };
 };
@@ -55,6 +79,7 @@ const getSavedSearch = () => {
 
 const MapView = () => {
   const savedSearch = getSavedSearch();
+  const isFirstSafetyEffect = useRef(true);
 
   const [showSidebar, setShowSidebar] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(320);
@@ -148,25 +173,23 @@ const MapView = () => {
       };
     }
 
-    const res = await axios.get(
-      `https://nominatim.openstreetmap.org/search?format=json&polygon_geojson=1&q=${encodeURIComponent(trimmedPlace)}`,
-    );
+    const results = await geocodePlaceWithNominatim(trimmedPlace);
 
-    if (!res.data?.length) {
+    if (!results?.length) {
       throw new Error(`No results found for "${trimmedPlace}".`);
     }
 
     const result =
-      res.data.find(
+      results.find(
         (item) =>
           item.geojson &&
           (item.type === "administrative" ||
             item.class === "boundary" ||
             item.class === "place"),
       ) ||
-      res.data.find((item) => item.geojson) ||
-      res.data.find((item) => item.boundingbox) ||
-      res.data[0];
+      results.find((item) => item.geojson) ||
+      results.find((item) => item.boundingbox) ||
+      results[0];
 
     return {
       coordinates: [parseFloat(result.lat), parseFloat(result.lon)],
@@ -203,7 +226,7 @@ const MapView = () => {
       ];
       const routeResponses = await Promise.allSettled(
         TRAVEL_MODES.map(async (travelMode) => {
-          const response = await getRoute(coordinates, travelMode);
+          const response = await getRoute(coordinates, travelMode, filters);
 
           return {
             mode: travelMode,
@@ -448,6 +471,27 @@ const MapView = () => {
     }
   };
 
+  const handleCloseSelectedPlace = () => {
+    setSelectedPlace(null);
+    setSelectedPlacePosition(null);
+    setPlaceDetailsError("");
+    setPlaceDetailsLoading(false);
+  };
+
+
+  useEffect(() => {
+    if (isFirstSafetyEffect.current) {
+      isFirstSafetyEffect.current = false;
+      return;
+    }
+
+    if (!from || !to || !routeCoords.length) {
+      return;
+    }
+
+    fetchRoute(mode);
+  }, [filters.safest]);
+
   return (
     <div
       className="map-container"
@@ -487,9 +531,12 @@ const MapView = () => {
         />
 
         <MapCanvas
+          endLabel={to}
           endPosition={endPosition}
           handlePlaceClick={handlePlaceClick}
+          hasSelectedPlace={Boolean(selectedPlace)}
           mapFocusPosition={mapFocusPosition}
+          onCloseSelectedPlace={handleCloseSelectedPlace}
           onOpenChatbot={() => setShowChatbot(true)}
           panelHeight={panelHeight}
           routeCoords={routeCoords}
@@ -499,6 +546,7 @@ const MapView = () => {
           searchPosition={searchPosition}
           setHoveredPlace={setHoveredPlace}
           showSidebar={showSidebar}
+          startLabel={from}
           startPosition={startPosition}
         />
 
@@ -516,11 +564,13 @@ const MapView = () => {
             detailMode
             error={placeDetailsError}
             loading={placeDetailsLoading}
+            onClose={handleCloseSelectedPlace}
             place={selectedPlace}
           />
         )}
 
         <MapBottomPanel
+          filters={filters}
           mode={mode}
           onModeChange={handleModeChange}
           onResizeStart={() => setDragPanel(true)}
@@ -536,3 +586,5 @@ const MapView = () => {
 };
 
 export default MapView;
+
+

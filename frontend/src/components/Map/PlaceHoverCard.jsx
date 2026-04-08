@@ -36,6 +36,7 @@ const PlaceHoverCard = ({
   detailMode = false,
   error,
   loading = false,
+  onClose,
   onViewMore,
   place,
 }) => {
@@ -71,6 +72,17 @@ const PlaceHoverCard = ({
   return (
     <>
       <div className={detailMode ? "hover-card detail-card" : "hover-card"}>
+        {detailMode && onClose && (
+          <button
+            type="button"
+            className="detail-card-back-btn"
+            onClick={onClose}
+          >
+            <ArrowIcon direction="left" />
+            Back To Route
+          </button>
+        )}
+
         <h4>{title}</h4>
 
         {detailMode ? (
