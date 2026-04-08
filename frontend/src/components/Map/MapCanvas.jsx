@@ -33,7 +33,12 @@ const EnableZoom = () => {
   return null;
 };
 
-const MapControls = ({ bottomOffset, onOpenChatbot }) => {
+const MapControls = ({
+  bottomOffset,
+  hasSelectedPlace,
+  onCloseSelectedPlace,
+  onOpenChatbot,
+}) => {
   const map = useMap();
 
   const handleLocate = () => {
@@ -92,6 +97,25 @@ const MapControls = ({ bottomOffset, onOpenChatbot }) => {
       </div>
 
       <div className="map-controls-bottom" style={{ bottom: bottomOffset + 12 }}>
+        {hasSelectedPlace && (
+          <button
+            className="control-btn"
+            onClick={onCloseSelectedPlace}
+            type="button"
+            aria-label="Back to route details"
+          >
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none">
+              <path
+                d="M14.5 5.5L8 12l6.5 6.5"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+        )}
+
         <button className="control-btn" onClick={handleLocate}>
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none">
             <path
@@ -150,7 +174,9 @@ const MapViewportController = ({ focusBounds, focusPosition, routeCoords }) => {
 const MapCanvas = ({
   endPosition,
   handlePlaceClick,
+  hasSelectedPlace,
   mapFocusPosition,
+  onCloseSelectedPlace,
   onOpenChatbot,
   panelHeight,
   routeCoords,
@@ -161,6 +187,8 @@ const MapCanvas = ({
   setHoveredPlace,
   showSidebar,
   startPosition,
+  startLabel,
+  endLabel,
 }) => {
   const renderInteractiveMarker = (place, popupLabel) => (
     <Marker
@@ -185,6 +213,8 @@ const MapCanvas = ({
       <EnableZoom />
       <MapControls
         bottomOffset={showSidebar ? panelHeight : 0}
+        hasSelectedPlace={hasSelectedPlace}
+        onCloseSelectedPlace={onCloseSelectedPlace}
         onOpenChatbot={onOpenChatbot}
       />
       <MapViewportController
@@ -201,21 +231,21 @@ const MapCanvas = ({
       {startPosition &&
         renderInteractiveMarker(
           {
-            name: "Start",
+            name: startLabel || "Start",
             category: "Route point",
             position: startPosition,
           },
-          "Start",
+          startLabel || "Start",
         )}
 
       {endPosition &&
         renderInteractiveMarker(
           {
-            name: "Destination",
+            name: endLabel || "Destination",
             category: "Route point",
             position: endPosition,
           },
-          "Destination",
+          endLabel || "Destination",
         )}
 
       {searchPosition &&
