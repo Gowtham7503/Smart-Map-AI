@@ -5,7 +5,8 @@
 │   │   └── icons.svg
 │   ├── src/
 │   │   ├── assets/
-│   │   │   └── mapbright.png
+│   │   │   ├── mapbright.png
+│   │   │   └── otp-illustration.svg        # NEW
 │   │   ├── components/
 │   │   │   ├── Chatbot/
 │   │   │   │   ├── Chatbot.css
@@ -21,16 +22,24 @@
 │   │   │   ├── Route/
 │   │   │   │   ├── Route.css
 │   │   │   │   └── RouteForm.jsx
-│   │   │   └── UI/
-│   │   │       ├── Button.css
-│   │   │       ├── Button.jsx
-│   │   │       └── Loader.jsx
+│   │   │   ├── UI/
+│   │   │   │   ├── Button.css
+│   │   │   │   ├── Button.jsx
+│   │   │   │   └── Loader.jsx
+│   │   │   └── Auth/                      # NEW
+│   │   │       ├── OtpInput.jsx
+│   │   │       └── AuthCard.jsx
 │   │   ├── pages/
 │   │   │   ├── Dashboard.jsx
 │   │   │   ├── Home.css
-│   │   │   └── Home.jsx
+│   │   │   ├── Home.jsx
+│   │   │   ├── Login.jsx                 # NEW
+│   │   │   ├── Register.jsx              # NEW
+│   │   │   ├── OtpPage.jsx               # NEW
+│   │   │   └── Auth.css                  # NEW
 │   │   ├── services/
-│   │   │   └── api.js
+│   │   │   ├── api.js
+│   │   │   └── authService.js           # NEW
 │   │   ├── App.css
 │   │   ├── App.jsx
 │   │   ├── index.css
@@ -44,7 +53,13 @@
 ├── backend/                      # Flask app
 │   ├── app/
 │   │   ├── routes/
-│   │   │   └── route_api.py
+│   │   │   ├── route_api.py
+│   │   │   └── auth_api.py           # NEW
+│   │   ├── services/                # NEW
+│   │   │   ├── otp_service.py
+│   │   │   └── user_service.py
+│   │   ├── utils/                   # NEW
+│   │   │   └── mailer.py
 │   │   └── __init__.py
 │   └── run.py
 ├── .gitignore

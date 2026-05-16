@@ -1,5 +1,6 @@
 ﻿import "./Home.css";
 import mapBright from "../assets/mapbright.png";
+import smartMapsLogo from "../assets/smartmaps_logo.svg";
 import { useNavigate } from "react-router-dom";
 
 const Home = () => {
@@ -8,9 +9,7 @@ const Home = () => {
     <div className="home-page">
       {/* ?? NAVBAR */}
       <header className="navbar">
-        <div className="logo">
-          Smart<span>Maps</span>
-        </div>
+        <img className="brand-logo-img home-logo" src={smartMapsLogo} alt="SmartMaps" />
 
         {/* ? FIXED: use ul > li */}
         <ul className="nav-links">
@@ -31,8 +30,7 @@ const Home = () => {
         <div className="overlay"></div>
 
         {/* ?? HERO CONTENT */}
-        <div className="hero-content">
-          <p className="tag">ABOUT</p>
+        <div className="hero-content">        
 
           <h1>
             Smart <span id="nav-green">Navigation</span>

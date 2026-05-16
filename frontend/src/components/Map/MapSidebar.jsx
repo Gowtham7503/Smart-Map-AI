@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import smartMapsLogo from "../../assets/smartmaps_logo.svg";
 
 const MapSidebar = ({
   fetchRoute,
@@ -22,10 +23,7 @@ const MapSidebar = ({
   return (
     <div className="sidebar" style={{ width: sidebarWidth }}>
       <div className="logo">
-        <h2>
-          Smart<span>Maps</span>
-        </h2>
-        <p>Safe • Smart • Sustainable</p>
+        <img className="brand-logo-img sidebar-logo" src={smartMapsLogo} alt="SmartMaps" />
       </div>
 
       <form

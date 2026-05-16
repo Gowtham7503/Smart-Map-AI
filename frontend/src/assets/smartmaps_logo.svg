@@ -1,0 +1,16 @@
+<svg width="100%" viewBox="0 0 680 200" role="img" xmlns="http://www.w3.org/2000/svg">
+  <title>SmartMaps logo</title>
+  <desc>SmartMaps logo with green map pin containing a lightning bolt, bold text reading SmartMaps, and tagline Safe Smart Sustainable</desc>
+
+  <g transform="translate(8 15) scale(0.87)">
+    <path d="M100 22 C68 22, 42 48, 42 80 C42 118, 100 168, 100 168 C100 168, 158 118, 158 80 C158 48, 132 22, 100 22 Z" fill="#2eaa47"/>
+    <circle cx="100" cy="78" r="34" fill="white"/>
+    <path d="M105 50 L88 82 L100 82 L95 106 L114 72 L102 72 Z" fill="#2eaa47"/>
+  </g>
+
+  <text x="148" y="120" font-family="Arial Black, Arial, sans-serif" font-size="72" font-weight="900" letter-spacing="-1">
+    <tspan fill="#000000">Smart</tspan><tspan fill="#2eaa47">Maps</tspan>
+  </text>
+
+  <text x="152" y="158" font-family="Arial, sans-serif" font-size="22" fill="#555555" letter-spacing="0.5">Safe &#8226; Smart &#8226; Sustainable</text>
+</svg>

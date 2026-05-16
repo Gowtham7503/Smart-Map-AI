@@ -1,17 +1,21 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import "./app.css";
-import smartAccessIllustration from "../assets/smart_access_illustration.svg";
+import smartAccessIllustration from "../assets/Register.svg";
+import smartMapsLogo from "../assets/smartmaps_logo.svg";
 import {
   FaArrowRight,
   FaEnvelope,
   FaEye,
+  FaEyeSlash,
   FaLock,
-  FaMapMarkerAlt,
   FaUser,
 } from "react-icons/fa";
 
 function Register() {
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
   return (
     <div className="main-container">
       <div className="login-card register-card">
@@ -30,14 +34,6 @@ function Register() {
         </div>
 
         <div className="right-section register-section">
-          <div className="logo register-logo">
-            <span className="brand-pin">
-              <FaMapMarkerAlt />
-            </span>
-            <span>
-              Smart<span className="green">Maps</span>
-            </span>
-          </div>
 
           <h1>Create Account</h1>
           <p className="subtitle">Join SmartMaps and start your journey</p>
@@ -64,18 +60,38 @@ function Register() {
             <label>Password *</label>
             <div className="input-box">
               <FaLock className="input-icon" />
-              <input type="password" placeholder="Enter your password" />
-              <FaEye className="eye-icon" />
+              <input
+                type={showPassword ? "text" : "password"}
+                placeholder="Enter your password"
+              />
+              {showPassword ? (
+                <FaEyeSlash className="eye-icon" onClick={() => setShowPassword(false)} />
+              ) : (
+                <FaEye className="eye-icon" onClick={() => setShowPassword(true)} />
+              )}
             </div>
 
             <label>Confirm Password *</label>
             <div className="input-box">
               <FaLock className="input-icon" />
-              <input type="password" placeholder="Confirm your password" />
-              <FaEye className="eye-icon" />
+              <input
+                type={showConfirmPassword ? "text" : "password"}
+                placeholder="Confirm your password"
+              />
+              {showConfirmPassword ? (
+                <FaEyeSlash
+                  className="eye-icon"
+                  onClick={() => setShowConfirmPassword(false)}
+                />
+              ) : (
+                <FaEye
+                  className="eye-icon"
+                  onClick={() => setShowConfirmPassword(true)}
+                />
+              )}
             </div>
 
-            <button type="submit">
+            <button type="submit" className="auth-submit-btn">
               Create Account <FaArrowRight />
             </button>
           </form>

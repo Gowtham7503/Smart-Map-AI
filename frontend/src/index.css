@@ -1,6 +1,15 @@
 body {
   margin: 0;
   font-family: Arial, sans-serif;
+  font-size: 14px;
+}
+
+.brand-logo-img {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  object-fit: contain;
 }
 
 .home {
