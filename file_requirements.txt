@@ -1,0 +1,70 @@
+Smart-Map-AI Project Requirements
+=================================
+
+Location
+--------
+This file is placed at the main architecture level beside folder_architecture.txt.
+
+Backend (Python / Flask)
+------------------------
+Detected from:
+- backend/run.py
+- backend/app/__init__.py
+- backend/app/routes/route_api.py
+
+Required Python packages:
+- Flask
+- flask-cors
+- python-dotenv
+- requests
+
+Suggested pip install command:
+pip install Flask flask-cors python-dotenv requests
+
+Backend environment variables:
+- ORS_API_KEY
+- TRAFFIC_API_KEY
+- UNSPLASH_API_KEY
+  or
+- UNSPLASH_ACCESS_KEY
+
+Backend notes:
+- Python standard library modules also used: datetime, functools, os, urllib.parse
+- The backend runs from backend/run.py and exposes Flask routes under /api
+
+Frontend (React / Vite)
+-----------------------
+Detected from:
+- frontend/package.json
+- frontend/src/**/*.jsx
+- frontend/src/services/api.js
+
+Runtime dependencies:
+- axios
+- leaflet
+- polyline
+- react
+- react-dom
+- react-leaflet
+- react-router-dom
+- vite-plugin-svgr
+
+Development dependencies:
+- @eslint/js
+- @types/react
+- @types/react-dom
+- @vitejs/plugin-react
+- eslint
+- eslint-plugin-react-hooks
+- eslint-plugin-react-refresh
+- globals
+- vite
+
+Suggested frontend install command:
+npm install
+
+Project summary
+---------------
+- Frontend: React + Vite application in frontend/
+- Backend: Flask application in backend/
+- Frontend talks to backend API at http://localhost:5000/api
