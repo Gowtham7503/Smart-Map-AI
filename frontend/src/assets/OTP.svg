@@ -1,0 +1,129 @@
+<svg width="100%" viewBox="0 0 680 820" role="img" xmlns="http://www.w3.org/2000/svg">
+<title>Smart Access. Smarter You. — Verify Your Account</title>
+<desc>Person sitting with laptop in front of large smartphone showing Verify Your Account OTP screen, surrounded by plants and city backdrop</desc>
+
+<defs>
+  <clipPath id="phoneClip">
+    <rect x="210" y="70" width="230" height="460" rx="32"/>
+  </clipPath>
+</defs>
+
+<rect x="20" y="20" width="640" height="770" rx="20" fill="#f0faf0"/>
+
+<ellipse cx="490" cy="310" rx="140" ry="125" fill="#c8eac8" opacity="0.45"/>
+<ellipse cx="155" cy="360" rx="95" ry="85" fill="#d4edd4" opacity="0.4"/>
+
+<rect x="448" y="300" width="32" height="95" rx="3" fill="#b8ddb8"/>
+<rect x="488" y="278" width="27" height="117" rx="3" fill="#a8d4a8"/>
+<rect x="522" y="312" width="36" height="83" rx="3" fill="#b8ddb8"/>
+<rect x="454" y="310" width="7" height="6" rx="1" fill="#e0f2e0"/>
+<rect x="466" y="310" width="7" height="6" rx="1" fill="#e0f2e0"/>
+<rect x="454" y="323" width="7" height="6" rx="1" fill="#e0f2e0"/>
+<rect x="466" y="323" width="7" height="6" rx="1" fill="#e0f2e0"/>
+<rect x="494" y="290" width="7" height="6" rx="1" fill="#e0f2e0"/>
+<rect x="506" y="290" width="7" height="6" rx="1" fill="#e0f2e0"/>
+<rect x="494" y="304" width="7" height="6" rx="1" fill="#e0f2e0"/>
+<rect x="528" y="320" width="8" height="6" rx="1" fill="#e0f2e0"/>
+<rect x="541" y="320" width="8" height="6" rx="1" fill="#e0f2e0"/>
+<rect x="528" y="333" width="8" height="6" rx="1" fill="#e0f2e0"/>
+
+<g transform="translate(548,108) rotate(-28)">
+  <polygon points="0,0 28,11 0,22" fill="#2d9e2d"/>
+  <polygon points="0,11 28,11 14,20" fill="#1a7a1a"/>
+</g>
+<circle cx="534" cy="122" r="2.5" fill="#2d9e2d" opacity="0.6"/>
+<circle cx="518" cy="140" r="2" fill="#2d9e2d" opacity="0.5"/>
+<circle cx="504" cy="160" r="2" fill="#2d9e2d" opacity="0.4"/>
+<circle cx="492" cy="182" r="1.5" fill="#2d9e2d" opacity="0.3"/>
+
+<ellipse cx="148" cy="168" rx="34" ry="19" fill="#d8eed8" opacity="0.75"/>
+<ellipse cx="170" cy="158" rx="24" ry="17" fill="#d8eed8" opacity="0.75"/>
+<ellipse cx="126" cy="163" rx="22" ry="15" fill="#d8eed8" opacity="0.75"/>
+
+<rect x="213" y="74" width="230" height="460" rx="32" fill="#1a1a2e"/>
+<rect x="226" y="90" width="204" height="428" rx="20" fill="#f8fdf8" clip-path="url(#phoneClip)"/>
+<rect x="298" y="70" width="62" height="20" rx="10" fill="#1a1a2e"/>
+
+<g transform="translate(328,200)">
+  <path d="M0,-46 C20,-46 40,-37 40,-37 L40,2 C40,24 22,38 0,46 C-22,38 -40,24 -40,2 L-40,-37 C-40,-37 -20,-46 0,-46 Z" fill="#2d9e2d"/>
+  <rect x="-15" y="-9" width="30" height="24" rx="5" fill="white"/>
+  <path d="M-10,-9 L-10,-20 C-10,-29 10,-29 10,-20 L10,-9" fill="none" stroke="white" stroke-width="5" stroke-linecap="round"/>
+  <circle cx="0" cy="5" r="5" fill="#2d9e2d"/>
+  <rect x="-3" y="5" width="6" height="7" rx="1" fill="#2d9e2d"/>
+</g>
+
+<text x="328" y="273" text-anchor="middle" font-family="sans-serif" font-size="19" font-weight="700" fill="#1a1a2e">Verify Your</text>
+<text x="328" y="296" text-anchor="middle" font-family="sans-serif" font-size="19" font-weight="700" fill="#1a1a2e">Account</text>
+<text x="328" y="318" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#888">Enter the OTP sent to</text>
+<text x="328" y="332" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#888">your email</text>
+
+<rect x="243" y="348" width="30" height="32" rx="6" fill="white" stroke="#d0e8d0" stroke-width="1.5"/>
+<rect x="281" y="348" width="30" height="32" rx="6" fill="white" stroke="#d0e8d0" stroke-width="1.5"/>
+<rect x="319" y="348" width="30" height="32" rx="6" fill="white" stroke="#d0e8d0" stroke-width="1.5"/>
+<rect x="357" y="348" width="30" height="32" rx="6" fill="white" stroke="#d0e8d0" stroke-width="1.5"/>
+<line x1="249" y1="375" x2="267" y2="375" stroke="#2d9e2d" stroke-width="2" stroke-linecap="round"/>
+<line x1="287" y1="375" x2="305" y2="375" stroke="#ccc" stroke-width="1.5" stroke-linecap="round"/>
+<line x1="325" y1="375" x2="343" y2="375" stroke="#ccc" stroke-width="1.5" stroke-linecap="round"/>
+<line x1="363" y1="375" x2="381" y2="375" stroke="#ccc" stroke-width="1.5" stroke-linecap="round"/>
+
+<ellipse cx="113" cy="578" rx="40" ry="13" fill="#5a3e28"/>
+<rect x="78" y="558" width="72" height="28" rx="7" fill="#6b4c30"/>
+<line x1="114" y1="558" x2="114" y2="438" stroke="#4a7c4a" stroke-width="6" stroke-linecap="round"/>
+<ellipse cx="84" cy="445" rx="42" ry="21" fill="#3a8f3a" transform="rotate(-28,84,445)"/>
+<ellipse cx="146" cy="432" rx="40" ry="19" fill="#2d9e2d" transform="rotate(24,146,432)"/>
+<ellipse cx="78" cy="480" rx="37" ry="18" fill="#4aaa4a" transform="rotate(-20,78,480)"/>
+<ellipse cx="150" cy="473" rx="35" ry="17" fill="#3a8f3a" transform="rotate(20,150,473)"/>
+<ellipse cx="92" cy="514" rx="30" ry="15" fill="#2d9e2d" transform="rotate(-14,92,514)"/>
+<ellipse cx="138" cy="508" rx="30" ry="14" fill="#4aaa4a" transform="rotate(14,138,508)"/>
+
+<ellipse cx="560" cy="572" rx="30" ry="10" fill="#5a3e28"/>
+<rect x="534" y="556" width="52" height="24" rx="5" fill="#6b4c30"/>
+<line x1="560" y1="556" x2="560" y2="492" stroke="#4a7c4a" stroke-width="4" stroke-linecap="round"/>
+<ellipse cx="536" cy="502" rx="30" ry="14" fill="#2d9e2d" transform="rotate(-24,536,502)"/>
+<ellipse cx="584" cy="496" rx="28" ry="13" fill="#3a8f3a" transform="rotate(22,584,496)"/>
+<ellipse cx="538" cy="530" rx="24" ry="12" fill="#4aaa4a" transform="rotate(-18,538,530)"/>
+<ellipse cx="580" cy="524" rx="24" ry="12" fill="#2d9e2d" transform="rotate(18,580,524)"/>
+
+<ellipse cx="340" cy="592" rx="310" ry="20" fill="#c8eac8" opacity="0.55"/>
+
+<ellipse cx="272" cy="588" rx="30" ry="13" fill="#2d9e2d"/>
+<ellipse cx="272" cy="583" rx="26" ry="9" fill="#3aaf3a"/>
+<rect x="250" y="576" width="15" height="8" rx="3" fill="white" opacity="0.4"/>
+<ellipse cx="358" cy="590" rx="28" ry="11" fill="#2d9e2d"/>
+<ellipse cx="358" cy="585" rx="24" ry="8" fill="#3aaf3a"/>
+<rect x="338" y="578" width="14" height="8" rx="3" fill="white" opacity="0.4"/>
+
+<path d="M258,568 Q288,592 315,576 Q342,592 374,568" fill="#2a2a3e"/>
+<ellipse cx="316" cy="564" rx="68" ry="26" fill="#2a2a3e"/>
+
+<rect x="272" y="462" width="98" height="116" rx="22" fill="#3aaf3a"/>
+<rect x="294" y="538" width="52" height="22" rx="9" fill="#2d9e2d"/>
+<path d="M272,502 Q238,524 243,562" fill="none" stroke="#3aaf3a" stroke-width="30" stroke-linecap="round"/>
+<path d="M370,502 Q396,524 390,560" fill="none" stroke="#3aaf3a" stroke-width="28" stroke-linecap="round"/>
+
+<rect x="245" y="545" width="148" height="88" rx="7" fill="#c0c0c8"/>
+<rect x="252" y="552" width="134" height="74" rx="5" fill="#1a1a2e"/>
+<rect x="256" y="556" width="126" height="66" rx="3" fill="#1e3a5f"/>
+<rect x="262" y="562" width="42" height="7" rx="2" fill="#4a9a4a" opacity="0.85"/>
+<rect x="262" y="573" width="62" height="4" rx="2" fill="#6aaa6a" opacity="0.65"/>
+<rect x="262" y="581" width="50" height="4" rx="2" fill="#6aaa6a" opacity="0.5"/>
+<rect x="237" y="630" width="164" height="9" rx="4" fill="#a8a8b0"/>
+<rect x="228" y="637" width="182" height="5" rx="2" fill="#909098"/>
+
+<rect x="305" y="448" width="28" height="24" rx="9" fill="#f5c5a0"/>
+<ellipse cx="319" cy="432" rx="34" ry="35" fill="#f5c5a0"/>
+<path d="M285,422 Q296,395 319,393 Q343,393 354,414 Q351,400 337,394 Q320,389 304,395 Q289,402 285,422Z" fill="#2a1a0a"/>
+<ellipse cx="319" cy="400" rx="26" ry="13" fill="#2a1a0a"/>
+<ellipse cx="307" cy="430" rx="4.5" ry="5" fill="#2a1a0a"/>
+<ellipse cx="330" cy="430" rx="4.5" ry="5" fill="#2a1a0a"/>
+<circle cx="309" cy="428" r="1.5" fill="white"/>
+<circle cx="332" cy="428" r="1.5" fill="white"/>
+<path d="M308,443 Q319,453 330,443" fill="none" stroke="#c08060" stroke-width="2.5" stroke-linecap="round"/>
+<path d="M302,423 Q308,420 314,423" fill="none" stroke="#2a1a0a" stroke-width="2" stroke-linecap="round"/>
+<path d="M324,423 Q330,420 336,423" fill="none" stroke="#2a1a0a" stroke-width="2" stroke-linecap="round"/>
+<ellipse cx="284" cy="434" rx="6" ry="9" fill="#f5c5a0"/>
+<ellipse cx="354" cy="434" rx="6" ry="9" fill="#f5c5a0"/>
+
+<text x="340" y="672" text-anchor="middle" font-family="sans-serif" font-size="23" font-weight="700" fill="#1a1a2e">Smart Access. Smarter You.</text>
+<text x="340" y="700" text-anchor="middle" font-family="sans-serif" font-size="15" fill="#4a7a4a">Secure  •  Simple  •  Seamless</text>
+</svg>

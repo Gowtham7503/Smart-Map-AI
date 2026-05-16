@@ -13,7 +13,7 @@
     position: absolute;
     top: 0;
     width: 100%;
-    padding: 20px 50px;
+    padding: 16px 42px;
 
     display: flex;
     justify-content: space-between;
@@ -24,15 +24,21 @@
 }
 
 .logo {
-    font-size: 1.8rem;
+    font-size: 1.45rem;
     font-weight: bold;
     color: white;
+}
+
+.home-logo {
+    width: 240px;
+    max-height: 72px;
 }
 
 .nav-links {
     list-style: none;
     display: flex;
-    gap: 30px;
+    gap: 22px;
+    font-size: 0.9rem;
 }
 
 .nav-links li {
@@ -73,8 +79,8 @@
 
     top: 50%;
     transform: translateY(-50%);
-    padding-left: 80px;
-    max-width: 700px;
+    padding-left: 64px;
+    max-width: 590px;
 }
 
 #nav-green{
@@ -84,32 +90,32 @@
 /* small tag */
 .tag {
     letter-spacing: 2px;
-    font-size: 0.9rem;
-    margin-bottom: 20px;
+    font-size: 0.78rem;
+    margin-bottom: 14px;
     opacity: 0.8;
 }
 
 /* main heading */
 .hero-content h1 {
-    font-size: 3.5rem;
+    font-size: clamp(2.25rem, 4.5vw, 3rem);
     line-height: 1.2;
 }
 
 /* description */
 .description {
-    margin-top: 20px;
-    font-size: 1.2rem;
+    margin-top: 16px;
+    font-size: 1rem;
     opacity: 0.9;
 }
 
 /* button */
 .hero-btn {
-    margin-top: 30px;
-    padding: 12px 25px;
+    margin-top: 24px;
+    padding: 10px 22px;
     border: none;
     background: white;
     color: black;
-    font-size: 1rem;
+    font-size: 0.92rem;
     cursor: pointer;
     border-radius: 30px;
     transition: 0.3s;

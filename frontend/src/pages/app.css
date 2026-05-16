@@ -22,23 +22,32 @@ body {
   justify-content: center;
   align-items: center;
 
-  padding: 20px;
+  padding: 16px;
 }
 
 .login-card {
   width: 92%;
-  max-width: 1150px;
-  height: 640px;
+  max-width: 980px;
+  height: min(540px, calc(100vh - 32px));
 
   background: white;
-  border-radius: 28px;
+  border-radius: 22px;
 
   display: flex;
   overflow: hidden;
 
   box-shadow: 0 10px 35px rgba(0, 0, 0, 0.08);
 }
+.forgot-link{
+  color: black;
+  transition: all 5ms ease-in-out;
+}
 
+.forgot-link:hover{
+  color:#2e7d32;
+  cursor: pointer;
+  
+}
 /* LEFT SECTION */
 
 .left-section {
@@ -62,7 +71,7 @@ body {
 
 .illustration-image {
   display: block;
-  width: min(500px, 92%);
+  width: min(380px, 86%);
   height: auto;
   opacity: 0.95;
 }
@@ -137,18 +146,18 @@ body {
 
 .bottom-text {
   text-align: center;
-  margin-top: 35px;
+  margin-top: 24px;
 }
 
 .bottom-text h3 {
-  font-size: 28px;
+  font-size: 22px;
   color: #29443d;
   margin-bottom: 8px;
 }
 
 .bottom-text p {
   color: #7d8d87;
-  font-size: 15px;
+  font-size: 13px;
 }
 
 /* RIGHT SECTION */
@@ -157,7 +166,7 @@ body {
   width: 48%;
   background: white;
 
-  padding: 50px 55px;
+  padding: 38px 46px;
 
   display: flex;
   flex-direction: column;
@@ -169,12 +178,19 @@ body {
   align-items: center;
   gap: 10px;
 
-  font-size: 34px;
+  font-size: 28px;
   font-weight: 700;
 
   color: #162b25;
 
-  margin-bottom: 28px;
+  margin-bottom: 12px;
+}
+
+.auth-logo {
+  width: 240px;
+  max-height: 60px;
+  max-width: 100%;
+  margin-left: 0;
 }
 
 .logo-icon {
@@ -186,42 +202,42 @@ body {
 }
 
 .right-section h1 {
-  font-size: 42px;
+  font-size: 34px;
   color: #18322a;
   margin-bottom: 6px;
 }
 
 .subtitle {
   color: #8a8a8a;
-  font-size: 17px;
-  margin-bottom: 30px;
+  font-size: 14px;
+  margin-bottom: 22px;
 }
 
-form label {
+.right-section form label {
   display: block;
 
-  font-size: 16px;
+  font-size: 13px;
   font-weight: 600;
 
   color: #22362f;
 
-  margin-bottom: 10px;
-  margin-top: 18px;
+  margin-bottom: 8px;
+  margin-top: 14px;
 }
 
 .input-box {
   width: 100%;
-  height: 58px;
+  height: 48px;
 
   border: 2px solid #d7ddd8;
-  border-radius: 14px;
+  border-radius: 12px;
 
   display: flex;
   align-items: center;
 
-  padding: 0 18px;
+  padding: 0 15px;
 
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 
   transition: 0.3s;
 }
@@ -233,12 +249,12 @@ form label {
 
 .input-icon {
   color: #7f8b84;
-  font-size: 17px;
+  font-size: 15px;
 }
 
 .eye-icon {
   color: #7f8b84;
-  font-size: 17px;
+  font-size: 15px;
   cursor: pointer;
 }
 
@@ -247,9 +263,9 @@ form label {
   border: none;
   outline: none;
 
-  font-size: 15px;
+  font-size: 13px;
 
-  margin-left: 14px;
+  margin-left: 12px;
 
   color: #2b2b2b;
 }
@@ -260,7 +276,7 @@ form label {
   align-items: center;
 
   margin-top: 6px;
-  margin-bottom: 28px;
+  margin-bottom: 22px;
 }
 
 .checkbox {
@@ -275,7 +291,7 @@ form label {
 }
 
 .checkbox span {
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 500;
   color: #243630;
 }
@@ -284,40 +300,34 @@ form label {
   text-decoration: none;
   color: #4caf50;
 
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 500;
 }
 
-button {
+.auth-submit-btn {
   width: 100%;
-  height: 60px;
-
+  height: 50px;
   border: none;
-  border-radius: 14px;
-
+  border-radius: 12px;
   background: linear-gradient(
     to right,
     #4caf50,
     #2e7d32
   );
-
   color: white;
-
-  font-size: 21px;
+  font-size: 17px;
   font-weight: 600;
-
   cursor: pointer;
-
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 12px;
-
   transition: 0.3s;
 }
 
-button:hover {
+.auth-submit-btn:hover {
   transform: translateY(-2px);
+  background: linear-gradient(to right, #43a047, #2b702d);
 }
 
 .divider {
@@ -327,11 +337,11 @@ button:hover {
 
   gap: 18px;
 
-  margin-top: 30px;
-  margin-bottom: 22px;
+  margin-top: 22px;
+  margin-bottom: 18px;
 
   color: #8d8d8d;
-  font-size: 16px;
+  font-size: 13px;
 }
 
 .divider span {
@@ -344,7 +354,7 @@ button:hover {
   text-align: center;
 
   color: #7b7b7b;
-  font-size: 16px;
+  font-size: 13px;
 }
 
 .signup a {
@@ -354,66 +364,78 @@ button:hover {
 }
 
 .register-card {
-  height: min(780px, calc(100vh - 40px));
+  height: min(620px, calc(100vh - 32px));
 }
 
 .register-section {
-  padding: 42px 58px;
-  overflow-y: auto;
+  padding: 24px 44px;
+  overflow: hidden;
 }
 
 .register-logo {
   justify-content: center;
-  font-size: 34px;
-  margin-bottom: 30px;
+  margin-bottom: 10px;
+}
+
+.register-logo .auth-logo {
+  width: 220px;
+  max-height: 56px;
 }
 
 .brand-pin {
-  width: 38px;
-  height: 38px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   background: linear-gradient(135deg, #48bd63, #1d7e39);
   color: white;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
+  font-size: 15px;
   box-shadow: 0 8px 18px rgba(52, 168, 83, 0.25);
 }
 
 .register-section h1 {
   text-align: center;
-  font-size: 32px;
-  margin-bottom: 8px;
+  font-size: 24px;
+  margin-bottom: 4px;
 }
 
 .register-section .subtitle {
   text-align: center;
-  margin-bottom: 28px;
+  margin-bottom: 10px;
 }
 
 .register-section form label {
-  margin-top: 14px;
-  margin-bottom: 8px;
+  font-size: 12px;
+  margin-top: 6px;
+  margin-bottom: 4px;
 }
 
 .register-section .input-box {
-  height: 56px;
-  border-radius: 12px;
-  margin-bottom: 12px;
+  height: 38px;
+  border-radius: 10px;
+  margin-bottom: 6px;
+  padding: 0 12px;
+}
+
+.register-section .input-box input {
+  font-size: 12px;
 }
 
 .register-section button {
-  margin-top: 14px;
+  height: 42px;
+  margin-top: 8px;
+  font-size: 15px;
 }
 
 .register-section .divider {
-  margin-top: 24px;
-  margin-bottom: 18px;
+  margin-top: 12px;
+  margin-bottom: 10px;
 }
 
 .register-illustration {
-  width: min(560px, 94%);
+  width: min(360px, 82%);
 }
 
 .register-bottom-text {
@@ -439,15 +461,15 @@ button:hover {
   }
 
   .left-section {
-    padding: 40px 0;
+    padding: 24px 0;
   }
 
   .right-section {
-    padding: 40px;
+    padding: 26px 28px;
   }
 
   .illustration-image {
-    width: min(360px, 90%);
+    width: min(300px, 86%);
   }
 
   .mobile-card {
@@ -461,11 +483,11 @@ button:hover {
   }
 
   .bottom-text h3 {
-    font-size: 24px;
+    font-size: 20px;
   }
 
   .right-section h1 {
-    font-size: 34px;
+    font-size: 28px;
   }
 
   .register-card {
@@ -473,15 +495,16 @@ button:hover {
   }
 
   .register-section {
-    padding: 36px 28px;
+    padding: 22px 24px;
     overflow: visible;
   }
 
-  .register-logo {
-    font-size: 30px;
+  .register-logo .auth-logo {
+    width: 200px;
+    max-height: 52px;
   }
 
   .register-section h1 {
-    font-size: 30px;
+    font-size: 23px;
   }
 }

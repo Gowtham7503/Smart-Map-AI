@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+﻿﻿import { useEffect, useRef, useState } from "react";
 import polyline from "polyline";
 import axios from "axios";
 import { getRoute } from "../../services/api";
@@ -522,6 +522,7 @@ const MapView = () => {
       <div className="map-area">
         <MapSearchBar
           onDirectionsClick={handleDirectionsFromSearch}
+          onMenuClick={() => setShowSidebar(!showSidebar)}
           onSearch={handleSearch}
           onSearchChange={setSearchQuery}
           onVoiceSearch={handleVoiceSearch}
@@ -586,5 +587,3 @@ const MapView = () => {
 };
 
 export default MapView;
-
-

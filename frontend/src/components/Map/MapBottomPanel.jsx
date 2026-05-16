@@ -352,5 +352,3 @@ const MapBottomPanel = ({
 };
 
 export default MapBottomPanel;
-
-

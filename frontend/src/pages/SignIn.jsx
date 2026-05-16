@@ -1,16 +1,24 @@
-import React from "react";
-import { Link } from "react-router-dom";
+import React, { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import "./app.css";
 import smartAccessIllustration from "../assets/smart_access_illustration.svg";
 import {
   FaUser,
   FaLock,
   FaEye,
+  FaEyeSlash,
   FaArrowRight,
-  FaMapMarkerAlt,
 } from "react-icons/fa";
 
 function App() {
+  const navigate = useNavigate();
+  const [showPassword, setShowPassword] = useState(false);
+
+  const handleSignIn = (e) => {
+    e.preventDefault();
+    navigate("/dashboard");
+  };
+
   return (
     <div className="main-container">
       <div className="login-card">
@@ -22,22 +30,13 @@ function App() {
               className="illustration-image"
             />
           </div>
-
-          <div className="bottom-text"></div>
         </div>
 
         <div className="right-section">
-          <div className="logo">
-            <FaMapMarkerAlt className="logo-icon" />
-            <span>
-              Smart<span className="green">Maps</span>
-            </span>
-          </div>
-
           <h1>Welcome Back</h1>
           <p className="subtitle">Sign in to continue your journey</p>
 
-          <form>
+          <form onSubmit={handleSignIn}>
             <label>Email / Hallticket Number *</label>
             <div className="input-box">
               <FaUser className="input-icon" />
@@ -50,20 +49,32 @@ function App() {
             <label>Password *</label>
             <div className="input-box">
               <FaLock className="input-icon" />
-              <input type="password" placeholder="Enter your password" />
-              <FaEye className="eye-icon" />
+              <input
+                type={showPassword ? "text" : "password"}
+                placeholder="Enter your password"
+              />
+              {showPassword ? (
+                <FaEyeSlash className="eye-icon" onClick={() => setShowPassword(false)} />
+              ) : (
+                <FaEye className="eye-icon" onClick={() => setShowPassword(true)} />
+              )}
             </div>
 
             <div className="options">
               <div className="checkbox">
-                <input type="checkbox" />
-                <span>Show Password</span>
+                
               </div>
 
-              <a href="/">Forgot Password?</a>
+              {/* ✅ UPDATED */}
+              <span
+                className="forgot-link"
+                onClick={() => navigate("/otp")}
+              >
+                Forgot Password?
+              </span>
             </div>
 
-            <button type="submit">
+            <button type="submit" className="auth-submit-btn">
               Sign In <FaArrowRight />
             </button>
           </form>
