@@ -1,3 +1,5 @@
+import { useNavigate } from "react-router-dom";
+
 const MapSidebar = ({
   fetchRoute,
   filters,
@@ -11,6 +13,8 @@ const MapSidebar = ({
   sidebarWidth,
   to,
 }) => {
+  const navigate = useNavigate();
+
   if (!showSidebar) {
     return null;
   }
@@ -164,7 +168,7 @@ const MapSidebar = ({
       </div>
 
       <div className="user-section">
-        <div className="user-card" onClick={() => alert("Redirect to Login Page")}>
+        <div className="user-card" onClick={() => navigate("/signin")}>
           <div className="user-left">
             <div className="user-avatar">G</div>
 
