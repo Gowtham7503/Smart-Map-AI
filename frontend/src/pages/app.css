@@ -1,0 +1,487 @@
+/* app.css */
+
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap");
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: "Poppins", sans-serif;
+}
+
+body {
+  background: #f2f9f0;
+  overflow: hidden;
+}
+
+.main-container {
+  width: 100%;
+  height: 100vh;
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  padding: 20px;
+}
+
+.login-card {
+  width: 92%;
+  max-width: 1150px;
+  height: 640px;
+
+  background: white;
+  border-radius: 28px;
+
+  display: flex;
+  overflow: hidden;
+
+  box-shadow: 0 10px 35px rgba(0, 0, 0, 0.08);
+}
+
+/* LEFT SECTION */
+
+.left-section {
+  width: 52%;
+  background: #f6fbf4;
+
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+
+  position: relative;
+}
+
+.illustration-wrapper {
+  position: relative;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.illustration-image {
+  display: block;
+  width: min(500px, 92%);
+  height: auto;
+  opacity: 0.95;
+}
+
+.mobile-card {
+  display: none;
+  position: absolute;
+
+  top: 35px;
+  left: 72px;
+
+  width: 200px;
+  height: 390px;
+
+  background: white;
+  border: 10px solid #14212b;
+  border-radius: 36px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.12);
+}
+
+.mobile-card::before {
+  content: "";
+  position: absolute;
+  top: -2px;
+
+  width: 90px;
+  height: 20px;
+
+  background: #14212b;
+
+  border-radius: 0 0 16px 16px;
+}
+
+.shield {
+  font-size: 40px;
+  margin-bottom: 18px;
+}
+
+.mobile-card h2 {
+  font-size: 24px;
+  color: #1f2f2c;
+  font-weight: 700;
+}
+
+.mobile-card p {
+  color: #8d9591;
+  font-size: 13px;
+  margin-top: 6px;
+}
+
+.tick {
+  width: 48px;
+  height: 48px;
+
+  background: #4caf50;
+  color: white;
+
+  border-radius: 50%;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  margin-top: 22px;
+
+  font-size: 22px;
+}
+
+.bottom-text {
+  text-align: center;
+  margin-top: 35px;
+}
+
+.bottom-text h3 {
+  font-size: 28px;
+  color: #29443d;
+  margin-bottom: 8px;
+}
+
+.bottom-text p {
+  color: #7d8d87;
+  font-size: 15px;
+}
+
+/* RIGHT SECTION */
+
+.right-section {
+  width: 48%;
+  background: white;
+
+  padding: 50px 55px;
+
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  font-size: 34px;
+  font-weight: 700;
+
+  color: #162b25;
+
+  margin-bottom: 28px;
+}
+
+.logo-icon {
+  color: #43b05c;
+}
+
+.green {
+  color: #43b05c;
+}
+
+.right-section h1 {
+  font-size: 42px;
+  color: #18322a;
+  margin-bottom: 6px;
+}
+
+.subtitle {
+  color: #8a8a8a;
+  font-size: 17px;
+  margin-bottom: 30px;
+}
+
+form label {
+  display: block;
+
+  font-size: 16px;
+  font-weight: 600;
+
+  color: #22362f;
+
+  margin-bottom: 10px;
+  margin-top: 18px;
+}
+
+.input-box {
+  width: 100%;
+  height: 58px;
+
+  border: 2px solid #d7ddd8;
+  border-radius: 14px;
+
+  display: flex;
+  align-items: center;
+
+  padding: 0 18px;
+
+  margin-bottom: 16px;
+
+  transition: 0.3s;
+}
+
+.input-box:focus-within {
+  border-color: #4caf50;
+  box-shadow: 0 0 0 4px rgba(76, 175, 80, 0.1);
+}
+
+.input-icon {
+  color: #7f8b84;
+  font-size: 17px;
+}
+
+.eye-icon {
+  color: #7f8b84;
+  font-size: 17px;
+  cursor: pointer;
+}
+
+.input-box input {
+  width: 100%;
+  border: none;
+  outline: none;
+
+  font-size: 15px;
+
+  margin-left: 14px;
+
+  color: #2b2b2b;
+}
+
+.options {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  margin-top: 6px;
+  margin-bottom: 28px;
+}
+
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.checkbox input {
+  width: 16px;
+  height: 16px;
+}
+
+.checkbox span {
+  font-size: 15px;
+  font-weight: 500;
+  color: #243630;
+}
+
+.options a {
+  text-decoration: none;
+  color: #4caf50;
+
+  font-size: 15px;
+  font-weight: 500;
+}
+
+button {
+  width: 100%;
+  height: 60px;
+
+  border: none;
+  border-radius: 14px;
+
+  background: linear-gradient(
+    to right,
+    #4caf50,
+    #2e7d32
+  );
+
+  color: white;
+
+  font-size: 21px;
+  font-weight: 600;
+
+  cursor: pointer;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+
+  transition: 0.3s;
+}
+
+button:hover {
+  transform: translateY(-2px);
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  gap: 18px;
+
+  margin-top: 30px;
+  margin-bottom: 22px;
+
+  color: #8d8d8d;
+  font-size: 16px;
+}
+
+.divider span {
+  width: 42%;
+  height: 1px;
+  background: #dddddd;
+}
+
+.signup {
+  text-align: center;
+
+  color: #7b7b7b;
+  font-size: 16px;
+}
+
+.signup a {
+  color: #3fa654;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.register-card {
+  height: min(780px, calc(100vh - 40px));
+}
+
+.register-section {
+  padding: 42px 58px;
+  overflow-y: auto;
+}
+
+.register-logo {
+  justify-content: center;
+  font-size: 34px;
+  margin-bottom: 30px;
+}
+
+.brand-pin {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #48bd63, #1d7e39);
+  color: white;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  box-shadow: 0 8px 18px rgba(52, 168, 83, 0.25);
+}
+
+.register-section h1 {
+  text-align: center;
+  font-size: 32px;
+  margin-bottom: 8px;
+}
+
+.register-section .subtitle {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.register-section form label {
+  margin-top: 14px;
+  margin-bottom: 8px;
+}
+
+.register-section .input-box {
+  height: 56px;
+  border-radius: 12px;
+  margin-bottom: 12px;
+}
+
+.register-section button {
+  margin-top: 14px;
+}
+
+.register-section .divider {
+  margin-top: 24px;
+  margin-bottom: 18px;
+}
+
+.register-illustration {
+  width: min(560px, 94%);
+}
+
+.register-bottom-text {
+  margin-top: 18px;
+}
+
+/* RESPONSIVE */
+
+@media (max-width: 1000px) {
+  body {
+    overflow-y: auto;
+  }
+
+  .login-card {
+    flex-direction: column;
+    width: 95%;
+    height: auto;
+  }
+
+  .left-section,
+  .right-section {
+    width: 100%;
+  }
+
+  .left-section {
+    padding: 40px 0;
+  }
+
+  .right-section {
+    padding: 40px;
+  }
+
+  .illustration-image {
+    width: min(360px, 90%);
+  }
+
+  .mobile-card {
+    width: 170px;
+    height: 320px;
+    left: 55px;
+  }
+
+  .mobile-card h2 {
+    font-size: 20px;
+  }
+
+  .bottom-text h3 {
+    font-size: 24px;
+  }
+
+  .right-section h1 {
+    font-size: 34px;
+  }
+
+  .register-card {
+    height: auto;
+  }
+
+  .register-section {
+    padding: 36px 28px;
+    overflow: visible;
+  }
+
+  .register-logo {
+    font-size: 30px;
+  }
+
+  .register-section h1 {
+    font-size: 30px;
+  }
+}
