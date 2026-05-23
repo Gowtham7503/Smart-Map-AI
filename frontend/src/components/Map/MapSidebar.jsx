@@ -1,5 +1,7 @@
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import smartMapsLogo from "../../assets/smartmaps_logo.svg";
+import { getCurrentUser, logoutUser } from "../../services/api";
 
 const MapSidebar = ({
   fetchRoute,
@@ -15,6 +17,23 @@ const MapSidebar = ({
   to,
 }) => {
   const navigate = useNavigate();
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    getCurrentUser()
+      .then((response) => setUser(response.data.user))
+      .catch(() => setUser(null));
+  }, []);
+
+  const handleUserAction = async () => {
+    if (!user) {
+      navigate("/signin");
+      return;
+    }
+
+    await logoutUser();
+    navigate("/signin");
+  };
 
   if (!showSidebar) {
     return null;
@@ -166,17 +185,17 @@ const MapSidebar = ({
       </div>
 
       <div className="user-section">
-        <div className="user-card" onClick={() => navigate("/signin")}>
+        <div className="user-card" onClick={handleUserAction}>
           <div className="user-left">
-            <div className="user-avatar">G</div>
+            <div className="user-avatar">{user?.firstName?.charAt(0) || "G"}</div>
 
             <div>
-              <p>Guest User</p>
-              <span>Sign in for personalized routes</span>
+              <p>{user ? `${user.firstName} ${user.lastName}` : "Guest User"}</p>
+              <span>{user ? user.email : "Sign in for personalized routes"}</span>
             </div>
           </div>
 
-          <div className="user-arrow">›</div>
+          <div className="user-arrow">{user ? "Sign out" : ">"}</div>
         </div>
       </div>
     </div>

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { loginUser } from "../services/api";
 import "./app.css";
 import smartAccessIllustration from "../assets/smart_access_illustration.svg";
 import {
@@ -13,10 +14,34 @@ import {
 function App() {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
+  const [formData, setFormData] = useState({
+    email: "",
+    password: "",
+  });
+  const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSignIn = (e) => {
-    e.preventDefault();
-    navigate("/dashboard");
+  const handleChange = (event) => {
+    const { name, value } = event.target;
+    setFormData((currentData) => ({
+      ...currentData,
+      [name]: value,
+    }));
+  };
+
+  const handleSignIn = async (event) => {
+    event.preventDefault();
+    setError("");
+
+    try {
+      setIsSubmitting(true);
+      await loginUser(formData);
+      navigate("/dashboard");
+    } catch (err) {
+      setError(err.response?.data?.message || "Unable to sign in.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -37,12 +62,16 @@ function App() {
           <p className="subtitle">Sign in to continue your journey</p>
 
           <form onSubmit={handleSignIn}>
-            <label>Email / Hallticket Number *</label>
+            <label>Email *</label>
             <div className="input-box">
               <FaUser className="input-icon" />
               <input
-                type="text"
-                placeholder="Enter your email or hallticket number"
+                type="email"
+                name="email"
+                value={formData.email}
+                onChange={handleChange}
+                placeholder="Enter your email"
+                required
               />
             </div>
 
@@ -51,7 +80,11 @@ function App() {
               <FaLock className="input-icon" />
               <input
                 type={showPassword ? "text" : "password"}
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
                 placeholder="Enter your password"
+                required
               />
               {showPassword ? (
                 <FaEyeSlash className="eye-icon" onClick={() => setShowPassword(false)} />
@@ -74,8 +107,10 @@ function App() {
               </span>
             </div>
 
-            <button type="submit" className="auth-submit-btn">
-              Sign In <FaArrowRight />
+            {error && <p className="auth-message auth-error">{error}</p>}
+
+            <button type="submit" className="auth-submit-btn" disabled={isSubmitting}>
+              {isSubmitting ? "Signing in..." : "Sign In"} <FaArrowRight />
             </button>
           </form>
 

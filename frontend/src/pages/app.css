@@ -330,6 +330,52 @@ body {
   background: linear-gradient(to right, #43a047, #2b702d);
 }
 
+.auth-submit-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+  transform: none;
+}
+
+.auth-message {
+  margin: 12px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.auth-error {
+  color: #b42318;
+}
+
+.auth-success {
+  color: #067647;
+}
+
+.password-rules {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px 10px;
+  margin: 2px 0 8px;
+}
+
+.password-rule {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #8a8f98;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.password-rule svg {
+  flex: 0 0 auto;
+  font-size: 9px;
+}
+
+.password-rule.valid {
+  color: #067647;
+}
+
 .divider {
   display: flex;
   align-items: center;
@@ -369,7 +415,27 @@ body {
 
 .register-section {
   padding: 24px 44px;
-  overflow: hidden;
+  justify-content: flex-start;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+.register-section::-webkit-scrollbar {
+  width: 8px;
+}
+
+.register-section::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.register-section::-webkit-scrollbar-thumb {
+  background: #d4ded5;
+  border-radius: 999px;
+}
+
+.register-section::-webkit-scrollbar-thumb:hover {
+  background: #b8c8ba;
 }
 
 .register-logo {
