@@ -363,6 +363,17 @@ body {
   font-weight: 600;
 }
 
+.auth-message {
+  margin-top: 14px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.auth-message.error {
+  color: #c0392b;
+}
+
 .register-card {
   height: min(620px, calc(100vh - 32px));
 }

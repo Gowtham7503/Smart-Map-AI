@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "./app.css";
 import smartAccessIllustration from "../assets/smart_access_illustration.svg";
+import { loginUser } from "../services/api";
 import {
   FaUser,
   FaLock,
@@ -13,10 +14,36 @@ import {
 function App() {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
+  const [formData, setFormData] = useState({
+    email: "",
+    password: "",
+  });
+  const [statusMessage, setStatusMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSignIn = (e) => {
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((currentData) => ({
+      ...currentData,
+      [name]: value,
+    }));
+  };
+
+  const handleSignIn = async (e) => {
     e.preventDefault();
-    navigate("/dashboard");
+    setStatusMessage("");
+    setIsSubmitting(true);
+
+    try {
+      await loginUser(formData);
+      navigate("/dashboard");
+    } catch (error) {
+      setStatusMessage(
+        error.response?.data?.error || "Unable to sign in. Please try again."
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -41,7 +68,10 @@ function App() {
             <div className="input-box">
               <FaUser className="input-icon" />
               <input
+                name="email"
                 type="text"
+                value={formData.email}
+                onChange={handleInputChange}
                 placeholder="Enter your email or hallticket number"
               />
             </div>
@@ -50,7 +80,10 @@ function App() {
             <div className="input-box">
               <FaLock className="input-icon" />
               <input
+                name="password"
                 type={showPassword ? "text" : "password"}
+                value={formData.password}
+                onChange={handleInputChange}
                 placeholder="Enter your password"
               />
               {showPassword ? (
@@ -75,9 +108,11 @@ function App() {
             </div>
 
             <button type="submit" className="auth-submit-btn">
-              Sign In <FaArrowRight />
+              {isSubmitting ? "Signing In..." : "Sign In"} <FaArrowRight />
             </button>
           </form>
+
+          {statusMessage && <p className="auth-message error">{statusMessage}</p>}
 
           <div className="divider">
             <span></span>
