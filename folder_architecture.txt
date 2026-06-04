@@ -1,4 +1,4 @@
-﻿smartmap/
+﻿﻿smartmap/
 ├── frontend/                     # React + Vite app
 │   ├── public/
 │   │   ├── favicon.svg
@@ -6,7 +6,9 @@
 │   ├── src/
 │   │   ├── assets/
 │   │   │   ├── mapbright.png
-│   │   │   └── otp-illustration.svg        # NEW
+│   │   │   ├── Register.svg
+│   │   │   ├── smart_access_illustration.svg
+│   │   │   └── smartmaps_logo.svg
 │   │   ├── components/
 │   │   │   ├── Chatbot/
 │   │   │   │   ├── Chatbot.css
@@ -26,20 +28,21 @@
 │   │   │   │   ├── Button.css
 │   │   │   │   ├── Button.jsx
 │   │   │   │   └── Loader.jsx
-│   │   │   └── Auth/                      # NEW
+│   │   │   ├── Auth/
 │   │   │       ├── OtpInput.jsx
 │   │   │       └── AuthCard.jsx
 │   │   ├── pages/
 │   │   │   ├── Dashboard.jsx
 │   │   │   ├── Home.css
 │   │   │   ├── Home.jsx
-│   │   │   ├── Login.jsx                 # NEW
-│   │   │   ├── Register.jsx              # NEW
-│   │   │   ├── OtpPage.jsx               # NEW
-│   │   │   └── Auth.css                  # NEW
+│   │   │   ├── SignIn.jsx
+│   │   │   ├── Register.jsx
+│   │   │   ├── OTP.jsx
+│   │   │   ├── Otp.css
+│   │   │   └── app.css
 │   │   ├── services/
 │   │   │   ├── api.js
-│   │   │   └── authService.js           # NEW
+│   │   │   └── authService.js
 │   │   ├── App.css
 │   │   ├── App.jsx
 │   │   ├── index.css
@@ -54,12 +57,13 @@
 │   ├── app/
 │   │   ├── routes/
 │   │   │   ├── route_api.py
-│   │   │   └── auth_api.py           # NEW
-│   │   ├── services/                # NEW
+│   │   │   └── auth_api.py
+│   │   ├── services/
 │   │   │   ├── otp_service.py
 │   │   │   └── user_service.py
-│   │   ├── utils/                   # NEW
+│   │   ├── utils/
 │   │   │   └── mailer.py
+│   │   ├── db.py
 │   │   └── __init__.py
 │   └── run.py
 ├── .gitignore
