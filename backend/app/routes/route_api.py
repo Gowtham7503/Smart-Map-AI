@@ -4,7 +4,7 @@ from functools import lru_cache
 import os
 from urllib.parse import quote
 
-from dotenv import load_dotenv
+from dotenv import dotenv_values, load_dotenv
 import requests
 
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
@@ -14,7 +14,6 @@ load_dotenv(ENV_PATH)
 
 api = Blueprint("api", __name__)
 
-ORS_API_KEY = os.getenv("ORS_API_KEY")
 TRAFFIC_API_KEY = (os.getenv("TRAFFIC_API_KEY") or "").strip()
 UNSPLASH_API_KEY = (os.getenv("UNSPLASH_API_KEY") or os.getenv("UNSPLASH_ACCESS_KEY") or "").strip()
 ORS_PROFILES = {
@@ -30,6 +29,13 @@ WIKIPEDIA_HEADERS = {
     "User-Agent": "smartmap/1.0 (place details lookup)",
     "Accept": "application/json",
 }
+
+
+def get_env_value(name):
+    value = os.getenv(name)
+    if value is None:
+        value = dotenv_values(ENV_PATH).get(name)
+    return (value or "").strip()
 
 
 def calculate_waytype_safety_score(waytype_summary):
@@ -370,9 +376,10 @@ def get_route():
     mode = (data.get("mode") or "car").strip().lower()
     filters = data.get("filters") or {}
     is_safe = bool(filters.get("safest", False))
+    ors_api_key = get_env_value("ORS_API_KEY")
 
-    if not ORS_API_KEY:
-        return jsonify({"error": "API key not loaded"}), 500
+    if not ors_api_key:
+        return jsonify({"error": "ORS_API_KEY is missing or empty in backend/.env"}), 500
 
     if not coordinates:
         return jsonify({"error": "Coordinates are required"}), 400
@@ -399,7 +406,7 @@ def get_route():
             f"https://api.openrouteservice.org/v2/directions/{profile}",
             json=request_body,
             headers={
-                "Authorization": ORS_API_KEY,
+                "Authorization": ors_api_key,
                 "Content-Type": "application/json",
             },
             timeout=20,
@@ -437,7 +444,7 @@ def get_route():
                 f"https://api.openrouteservice.org/v2/directions/{profile}",
                 json=fallback_body,
                 headers={
-                    "Authorization": ORS_API_KEY,
+                    "Authorization": ors_api_key,
                     "Content-Type": "application/json",
                 },
                 timeout=20,

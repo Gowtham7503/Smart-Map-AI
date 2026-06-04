@@ -1,16 +1,25 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { registerUser } from "../services/api";
 import "./app.css";
 import smartAccessIllustration from "../assets/Register.svg";
-import { registerUser } from "../services/api";
 import {
   FaArrowRight,
+  FaCheck,
   FaEnvelope,
   FaEye,
   FaEyeSlash,
   FaLock,
   FaUser,
 } from "react-icons/fa";
+
+const getPasswordChecks = (password) => [
+  { label: "8 characters minimum", valid: password.length >= 8 },
+  { label: "Uppercase letter", valid: /[A-Z]/.test(password) },
+  { label: "Lowercase letter", valid: /[a-z]/.test(password) },
+  { label: "Number", valid: /\d/.test(password) },
+  { label: "Special character", valid: /[!@#$%^&*(),.?":{}|<>]/.test(password) },
+];
 
 function Register() {
   const navigate = useNavigate();
@@ -23,41 +32,51 @@ function Register() {
     password: "",
     confirmPassword: "",
   });
-  const [statusMessage, setStatusMessage] = useState("");
+  const [status, setStatus] = useState("");
+  const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const passwordChecks = getPasswordChecks(formData.password);
+  const isPasswordStrong = passwordChecks.every((check) => check.valid);
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
+  const handleChange = (event) => {
+    const { name, value } = event.target;
     setFormData((currentData) => ({
       ...currentData,
       [name]: value,
     }));
   };
 
-  const handleRegister = async (e) => {
-    e.preventDefault();
-    setStatusMessage("");
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setStatus("");
+    setError("");
 
     if (formData.password !== formData.confirmPassword) {
-      setStatusMessage("Passwords do not match");
+      setError("Passwords do not match.");
       return;
     }
 
-    setIsSubmitting(true);
+    if (!isPasswordStrong) {
+      setError(
+        "Password must be at least 8 characters and include uppercase, lowercase, number, and special character."
+      );
+      return;
+    }
 
     try {
-      await registerUser({
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        email: formData.email,
-        password: formData.password,
+      setIsSubmitting(true);
+      const response = await registerUser(formData);
+      setStatus(response.data.message || "Account created successfully.");
+      setFormData({
+        firstName: "",
+        lastName: "",
+        email: "",
+        password: "",
+        confirmPassword: "",
       });
       navigate("/signin");
-    } catch (error) {
-      setStatusMessage(
-        error.response?.data?.error ||
-          "Unable to create account. Please try again."
-      );
+    } catch (err) {
+      setError(err.response?.data?.message || "Unable to create account.");
     } finally {
       setIsSubmitting(false);
     }
@@ -85,16 +104,17 @@ function Register() {
           <h1>Create Account</h1>
           <p className="subtitle">Join SmartMaps and start your journey</p>
 
-          <form onSubmit={handleRegister}>
+          <form onSubmit={handleSubmit}>
             <label>First Name *</label>
             <div className="input-box">
               <FaUser className="input-icon" />
               <input
-                name="firstName"
                 type="text"
+                name="firstName"
                 value={formData.firstName}
-                onChange={handleInputChange}
+                onChange={handleChange}
                 placeholder="Enter your first name"
+                required
               />
             </div>
 
@@ -102,11 +122,12 @@ function Register() {
             <div className="input-box">
               <FaUser className="input-icon" />
               <input
-                name="lastName"
                 type="text"
+                name="lastName"
                 value={formData.lastName}
-                onChange={handleInputChange}
+                onChange={handleChange}
                 placeholder="Enter your last name"
+                required
               />
             </div>
 
@@ -114,11 +135,12 @@ function Register() {
             <div className="input-box">
               <FaEnvelope className="input-icon" />
               <input
-                name="email"
                 type="email"
+                name="email"
                 value={formData.email}
-                onChange={handleInputChange}
+                onChange={handleChange}
                 placeholder="Enter your email"
+                required
               />
             </div>
 
@@ -126,11 +148,12 @@ function Register() {
             <div className="input-box">
               <FaLock className="input-icon" />
               <input
-                name="password"
                 type={showPassword ? "text" : "password"}
+                name="password"
                 value={formData.password}
-                onChange={handleInputChange}
+                onChange={handleChange}
                 placeholder="Enter your password"
+                required
               />
               {showPassword ? (
                 <FaEyeSlash className="eye-icon" onClick={() => setShowPassword(false)} />
@@ -138,16 +161,27 @@ function Register() {
                 <FaEye className="eye-icon" onClick={() => setShowPassword(true)} />
               )}
             </div>
+            <div className="password-rules">
+              {passwordChecks.map((check) => (
+                <span
+                  key={check.label}
+                  className={check.valid ? "password-rule valid" : "password-rule"}
+                >
+                  <FaCheck /> {check.label}
+                </span>
+              ))}
+            </div>
 
             <label>Confirm Password *</label>
             <div className="input-box">
               <FaLock className="input-icon" />
               <input
-                name="confirmPassword"
                 type={showConfirmPassword ? "text" : "password"}
+                name="confirmPassword"
                 value={formData.confirmPassword}
-                onChange={handleInputChange}
+                onChange={handleChange}
                 placeholder="Confirm your password"
+                required
               />
               {showConfirmPassword ? (
                 <FaEyeSlash
@@ -162,13 +196,17 @@ function Register() {
               )}
             </div>
 
-            <button type="submit" className="auth-submit-btn">
-              {isSubmitting ? "Creating Account..." : "Create Account"}{" "}
-              <FaArrowRight />
+            {error && <p className="auth-message auth-error">{error}</p>}
+            {status && <p className="auth-message auth-success">{status}</p>}
+
+            <button
+              type="submit"
+              className="auth-submit-btn"
+              disabled={isSubmitting || !isPasswordStrong}
+            >
+              {isSubmitting ? "Creating..." : "Create Account"} <FaArrowRight />
             </button>
           </form>
-
-          {statusMessage && <p className="auth-message error">{statusMessage}</p>}
 
           <div className="divider">
             <span></span>
