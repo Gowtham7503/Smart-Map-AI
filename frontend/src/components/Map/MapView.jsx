@@ -1,7 +1,7 @@
-﻿﻿import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import polyline from "polyline";
 import axios from "axios";
-import { getRoute } from "../../services/api";
+import { getRoute, getCurrentUser } from "../../services/api";
 import MapBottomPanel from "./MapBottomPanel";
 import MapCanvas from "./MapCanvas";
 import PlaceHoverCard from "./PlaceHoverCard";
@@ -87,6 +87,7 @@ const MapView = () => {
   const [dragSidebar, setDragSidebar] = useState(false);
   const [dragPanel, setDragPanel] = useState(false);
   const [routeCoords, setRouteCoords] = useState([]);
+  const [user, setUser] = useState(null);
   const [routeSummaries, setRouteSummaries] = useState({
     car: null,
     bike: null,
@@ -262,7 +263,14 @@ const MapView = () => {
         nextRouteDataByMode.walk;
 
       if (!activeRoute) {
-        throw new Error("Unable to fetch route details for any travel mode.");
+        // Extract the actual error from the failed requests to provide a better alert
+        const firstFailure = routeResponses.find((r) => r.status === "rejected");
+        const backendError =
+          firstFailure?.reason?.response?.data?.error ||
+          firstFailure?.reason?.response?.data?.details ||
+          firstFailure?.reason?.message;
+
+        throw new Error(backendError || "Unable to fetch route details for any travel mode.");
       }
 
       setRouteDataByMode(nextRouteDataByMode);
@@ -478,6 +486,18 @@ const MapView = () => {
     setPlaceDetailsLoading(false);
   };
 
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const response = await getCurrentUser();
+        setUser(response.data.user);
+      } catch {
+        console.log("Not logged in or session expired");
+        setUser(null);
+      }
+    };
+    fetchUserData();
+  }, []);
 
   useEffect(() => {
     if (isFirstSafetyEffect.current) {
@@ -490,7 +510,9 @@ const MapView = () => {
     }
 
     fetchRoute(mode);
-  }, [filters.safest]);
+    // Re-run only when route preference filters change; route inputs are read from current state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.safest, filters.pollution, filters.traffic]);
 
   return (
     <div
@@ -510,6 +532,7 @@ const MapView = () => {
         showSidebar={showSidebar}
         sidebarWidth={sidebarWidth}
         to={to}
+        user={user}
       />
 
       {showSidebar && (

@@ -1,7 +1,6 @@
-import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import smartMapsLogo from "../../assets/smartmaps_logo.svg";
-import { getCurrentUser, logoutUser } from "../../services/api";
+import { logoutUser } from "../../services/api";
 
 const MapSidebar = ({
   fetchRoute,
@@ -15,16 +14,9 @@ const MapSidebar = ({
   showSidebar,
   sidebarWidth,
   to,
+  user,
 }) => {
   const navigate = useNavigate();
-  const [user, setUser] = useState(null);
-
-  useEffect(() => {
-    getCurrentUser()
-      .then((response) => setUser(response.data.user))
-      .catch(() => setUser(null));
-  }, []);
-
   const handleUserAction = async () => {
     if (!user) {
       navigate("/signin");

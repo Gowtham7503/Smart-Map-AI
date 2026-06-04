@@ -69,3 +69,26 @@ OSError: [WinError 10038] An operation was attempted on something that is not a 
 127.0.0.1 - - [23/May/2026 23:41:31] "GET /api/auth/me HTTP/1.1" 200 -
 127.0.0.1 - - [23/May/2026 23:41:31] "GET /api/auth/me HTTP/1.1" 200 -
 127.0.0.1 - - [23/May/2026 23:41:32] "GET /api/auth/me HTTP/1.1" 200 -
+ * Detected change in 'C:\\projects\\smartmap\\backend\\app\\routes\\authapi.py', reloading
+Exception in thread Thread-1:
+Traceback (most recent call last):
+  File "C:\Program Files\Python39\lib\threading.py", line 980, in _bootstrap_inner
+    self.run()
+  File "C:\Program Files\Python39\lib\threading.py", line 917, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\gowth\AppData\Roaming\Python\Python39\site-packages\werkzeug\serving.py", line 819, in serve_forever
+    super().serve_forever(poll_interval=poll_interval)
+  File "C:\Program Files\Python39\lib\socketserver.py", line 232, in serve_forever
+    ready = selector.select(poll_interval)
+  File "C:\Program Files\Python39\lib\selectors.py", line 324, in select
+    r, w, _ = self._select(self._readers, self._writers, [], timeout)
+  File "C:\Program Files\Python39\lib\selectors.py", line 315, in _select
+    r, w, x = select.select(r, w, w, timeout)
+OSError: [WinError 10038] An operation was attempted on something that is not a socket
+ * Restarting with stat
+Traceback (most recent call last):
+  File "C:\projects\smartmap\backend\run.py", line 1, in <module>
+    from app import create_app
+  File "C:\projects\smartmap\backend\app\__init__.py", line 2, in <module>
+    from . import db
+ImportError: cannot import name 'db' from partially initialized module 'app' (most likely due to a circular import) (C:\projects\smartmap\backend\app\__init__.py)

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { loginUser } from "../services/api";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { loginUser, requestPasswordResetOtp } from "../services/api";
 import "./app.css";
 import smartAccessIllustration from "../assets/smart_access_illustration.svg";
 import {
@@ -11,15 +11,18 @@ import {
   FaArrowRight,
 } from "react-icons/fa";
 
-function App() {
+function SignIn() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     email: "",
     password: "",
   });
   const [error, setError] = useState("");
+  const [status, setStatus] = useState(location.state?.message || "");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -32,6 +35,7 @@ function App() {
   const handleSignIn = async (event) => {
     event.preventDefault();
     setError("");
+    setStatus("");
 
     try {
       setIsSubmitting(true);
@@ -41,6 +45,28 @@ function App() {
       setError(err.response?.data?.message || "Unable to sign in.");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    setError("");
+    setStatus("");
+    const email = formData.email.trim();
+
+    if (!email) {
+      setError("Enter your email first, then click Forgot Password.");
+      return;
+    }
+
+    try {
+      setIsSendingOtp(true);
+      await requestPasswordResetOtp(email);
+      sessionStorage.setItem("smartmap:password-reset-email", email);
+      navigate("/otp");
+    } catch (err) {
+      setError(err.response?.data?.message || "Unable to send OTP.");
+    } finally {
+      setIsSendingOtp(false);
     }
   };
 
@@ -101,13 +127,14 @@ function App() {
               {/* ✅ UPDATED */}
               <span
                 className="forgot-link"
-                onClick={() => navigate("/otp")}
+                onClick={handleForgotPassword}
               >
-                Forgot Password?
+                {isSendingOtp ? "Sending OTP..." : "Forgot Password?"}
               </span>
             </div>
 
             {error && <p className="auth-message auth-error">{error}</p>}
+            {status && <p className="auth-message auth-success">{status}</p>}
 
             <button type="submit" className="auth-submit-btn" disabled={isSubmitting}>
               {isSubmitting ? "Signing in..." : "Sign In"} <FaArrowRight />
@@ -130,4 +157,4 @@ function App() {
   );
 }
 
-export default App;
+export default SignIn;

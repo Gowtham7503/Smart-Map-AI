@@ -3,7 +3,6 @@ import { Link, useNavigate } from "react-router-dom";
 import { registerUser } from "../services/api";
 import "./app.css";
 import smartAccessIllustration from "../assets/Register.svg";
-import smartMapsLogo from "../assets/smartmaps_logo.svg";
 import {
   FaArrowRight,
   FaCheck,
@@ -19,7 +18,7 @@ const getPasswordChecks = (password) => [
   { label: "Uppercase letter", valid: /[A-Z]/.test(password) },
   { label: "Lowercase letter", valid: /[a-z]/.test(password) },
   { label: "Number", valid: /\d/.test(password) },
-  { label: "Special character", valid: /[^A-Za-z0-9]/.test(password) },
+  { label: "Special character", valid: /[!@#$%^&*(),.?":{}|<>]/.test(password) },
 ];
 
 function Register() {
