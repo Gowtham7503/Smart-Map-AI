@@ -25,7 +25,7 @@ ORS_PROFILES = {
 OVERPASS_API_URL = "https://overpass-api.de/api/interpreter"
 TOMTOM_FLOW_URL = "https://api.tomtom.com/traffic/services/4/flowSegmentData/absolute/10/json"
 POI_RADIUS_METERS = 500
-POI_SAMPLE_LIMIT = 3
+PI_SAMPLE_LIMIT = 3
 WIKIPEDIA_HEADERS = {
     "User-Agent": "smartmap/1.0 (place details lookup)",
     "Accept": "application/json",
@@ -137,7 +137,7 @@ def decode_polyline(encoded):
     return coordinates
 
 
-def sample_route_points(decoded_coordinates, sample_limit=POI_SAMPLE_LIMIT):
+def sample_route_points(decoded_coordinates, sample_limit=PI_SAMPLE_LIMIT):
     if not decoded_coordinates:
         return []
 
