@@ -65,6 +65,26 @@ label {
   display: block;
 }
 
+.otp-form-input {
+  width: 100%;
+  padding: 13px 14px;
+  border-radius: 10px;
+  border: 1px solid #ccc;
+  font-size: 14px;
+  outline: none;
+  margin-bottom: 18px;
+}
+
+.otp-form-input:focus {
+  border-color: #2d9e2d;
+  box-shadow: 0 0 0 2px rgba(45, 158, 45, 0.1);
+}
+
+.otp-form-input:disabled {
+  background: #f4f6f4;
+  color: #666;
+}
+
 .otp-inputs {
   display: flex;
   gap: 12px;
@@ -94,9 +114,18 @@ label {
   margin-bottom: 25px;
 }
 
-.resend a {
+.resend button {
+  background: none;
+  border: none;
   color: #2d9e2d;
+  cursor: pointer;
+  font-size: 13px;
   text-decoration: none;
+}
+
+.resend button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
 }
 
 .timer {
@@ -120,6 +149,12 @@ label {
 
 .verify-btn:hover {
   transform: translateY(-2px);
+}
+
+.verify-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.75;
+  transform: none;
 }
 
 /* ✅ BACK BUTTON (FIXED PROPERLY) */

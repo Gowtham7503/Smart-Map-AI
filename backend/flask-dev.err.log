@@ -1,0 +1,94 @@
+WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on http://127.0.0.1:5000
+Press CTRL+C to quit
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 106-492-677
+127.0.0.1 - - [23/May/2026 23:24:32] "GET /api/auth/me HTTP/1.1" 401 -
+127.0.0.1 - - [23/May/2026 23:24:52] "POST /api/auth/register HTTP/1.1" 201 -
+127.0.0.1 - - [23/May/2026 23:24:53] "POST /api/auth/login HTTP/1.1" 200 -
+127.0.0.1 - - [23/May/2026 23:24:53] "GET /api/auth/me HTTP/1.1" 200 -
+127.0.0.1 - - [23/May/2026 23:24:53] "POST /api/auth/logout HTTP/1.1" 200 -
+127.0.0.1 - - [23/May/2026 23:24:54] "GET /api/auth/me HTTP/1.1" 401 -
+127.0.0.1 - - [23/May/2026 23:26:12] "OPTIONS /api/auth/register HTTP/1.1" 200 -
+127.0.0.1 - - [23/May/2026 23:26:12] "POST /api/auth/register HTTP/1.1" 201 -
+127.0.0.1 - - [23/May/2026 23:26:22] "OPTIONS /api/auth/login HTTP/1.1" 200 -
+127.0.0.1 - - [23/May/2026 23:26:22] "POST /api/auth/login HTTP/1.1" 401 -
+127.0.0.1 - - [23/May/2026 23:27:02] "OPTIONS /api/auth/login HTTP/1.1" 200 -
+127.0.0.1 - - [23/May/2026 23:27:03] "POST /api/auth/login HTTP/1.1" 200 -
+127.0.0.1 - - [23/May/2026 23:27:03] "GET /api/auth/me HTTP/1.1" 200 -
+127.0.0.1 - - [23/May/2026 23:27:03] "GET /api/auth/me HTTP/1.1" 200 -
+127.0.0.1 - - [23/May/2026 23:27:03] "GET /api/auth/me HTTP/1.1" 200 -
+127.0.0.1 - - [23/May/2026 23:27:04] "GET /api/auth/me HTTP/1.1" 200 -
+ * Detected change in 'C:\\projects\\smartmap\\backend\\app\\routes\\authapi.py', reloading
+Exception in thread Thread-1:
+Traceback (most recent call last):
+  File "C:\Program Files\Python39\lib\threading.py", line 980, in _bootstrap_inner
+    self.run()
+  File "C:\Program Files\Python39\lib\threading.py", line 917, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\gowth\AppData\Roaming\Python\Python39\site-packages\werkzeug\serving.py", line 819, in serve_forever
+    super().serve_forever(poll_interval=poll_interval)
+  File "C:\Program Files\Python39\lib\socketserver.py", line 232, in serve_forever
+    ready = selector.select(poll_interval)
+  File "C:\Program Files\Python39\lib\selectors.py", line 324, in select
+    r, w, _ = self._select(self._readers, self._writers, [], timeout)
+  File "C:\Program Files\Python39\lib\selectors.py", line 315, in _select
+    r, w, x = select.select(r, w, w, timeout)
+OSError: [WinError 10038] An operation was attempted on something that is not a socket
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 106-492-677
+127.0.0.1 - - [23/May/2026 23:31:23] "POST /api/auth/logout HTTP/1.1" 200 -
+127.0.0.1 - - [23/May/2026 23:35:07] "OPTIONS /api/auth/register HTTP/1.1" 200 -
+127.0.0.1 - - [23/May/2026 23:35:08] "POST /api/auth/register HTTP/1.1" 201 -
+127.0.0.1 - - [23/May/2026 23:37:46] "OPTIONS /api/auth/login HTTP/1.1" 200 -
+127.0.0.1 - - [23/May/2026 23:37:47] "POST /api/auth/login HTTP/1.1" 200 -
+127.0.0.1 - - [23/May/2026 23:37:47] "GET /api/auth/me HTTP/1.1" 200 -
+127.0.0.1 - - [23/May/2026 23:37:48] "GET /api/auth/me HTTP/1.1" 200 -
+127.0.0.1 - - [23/May/2026 23:37:48] "GET /api/auth/me HTTP/1.1" 200 -
+127.0.0.1 - - [23/May/2026 23:37:48] "GET /api/auth/me HTTP/1.1" 200 -
+127.0.0.1 - - [23/May/2026 23:37:52] "POST /api/auth/logout HTTP/1.1" 200 -
+127.0.0.1 - - [23/May/2026 23:38:02] "OPTIONS /api/auth/login HTTP/1.1" 200 -
+127.0.0.1 - - [23/May/2026 23:38:02] "POST /api/auth/login HTTP/1.1" 200 -
+127.0.0.1 - - [23/May/2026 23:38:02] "GET /api/auth/me HTTP/1.1" 200 -
+127.0.0.1 - - [23/May/2026 23:38:03] "GET /api/auth/me HTTP/1.1" 200 -
+127.0.0.1 - - [23/May/2026 23:38:03] "GET /api/auth/me HTTP/1.1" 200 -
+127.0.0.1 - - [23/May/2026 23:38:03] "GET /api/auth/me HTTP/1.1" 200 -
+127.0.0.1 - - [23/May/2026 23:40:05] "GET /api/place-details?q=New%20Delhi,%20Delhi,%20India HTTP/1.1" 502 -
+127.0.0.1 - - [23/May/2026 23:40:27] "GET /api/auth/me HTTP/1.1" 200 -
+127.0.0.1 - - [23/May/2026 23:40:28] "GET /api/auth/me HTTP/1.1" 200 -
+127.0.0.1 - - [23/May/2026 23:40:28] "GET /api/auth/me HTTP/1.1" 200 -
+127.0.0.1 - - [23/May/2026 23:40:28] "GET /api/auth/me HTTP/1.1" 200 -
+127.0.0.1 - - [23/May/2026 23:40:34] "GET /api/place-details?q=New%20Delhi,%20Delhi,%20India HTTP/1.1" 502 -
+127.0.0.1 - - [23/May/2026 23:40:39] "GET /api/place-details?q=New%20Delhi,%20Delhi,%20India HTTP/1.1" 502 -
+127.0.0.1 - - [23/May/2026 23:40:44] "GET /api/place-details?q=New%20Delhi,%20Delhi,%20India HTTP/1.1" 502 -
+127.0.0.1 - - [23/May/2026 23:40:57] "GET /api/place-details?q=Hyderabad,%20Bahadurpura%20mandal,%20\u0c39\u0c48\u0c26\u0c30\u0c3e\u0c2c\u0c3e\u0c26\u0c41,%20Telangana,%20India HTTP/1.1" 502 -
+127.0.0.1 - - [23/May/2026 23:40:59] "GET /api/place-details?q=Hyderabad,%20Bahadurpura%20mandal,%20\u0c39\u0c48\u0c26\u0c30\u0c3e\u0c2c\u0c3e\u0c26\u0c41,%20Telangana,%20India HTTP/1.1" 502 -
+127.0.0.1 - - [23/May/2026 23:41:31] "GET /api/auth/me HTTP/1.1" 200 -
+127.0.0.1 - - [23/May/2026 23:41:31] "GET /api/auth/me HTTP/1.1" 200 -
+127.0.0.1 - - [23/May/2026 23:41:31] "GET /api/auth/me HTTP/1.1" 200 -
+127.0.0.1 - - [23/May/2026 23:41:32] "GET /api/auth/me HTTP/1.1" 200 -
+ * Detected change in 'C:\\projects\\smartmap\\backend\\app\\routes\\authapi.py', reloading
+Exception in thread Thread-1:
+Traceback (most recent call last):
+  File "C:\Program Files\Python39\lib\threading.py", line 980, in _bootstrap_inner
+    self.run()
+  File "C:\Program Files\Python39\lib\threading.py", line 917, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\gowth\AppData\Roaming\Python\Python39\site-packages\werkzeug\serving.py", line 819, in serve_forever
+    super().serve_forever(poll_interval=poll_interval)
+  File "C:\Program Files\Python39\lib\socketserver.py", line 232, in serve_forever
+    ready = selector.select(poll_interval)
+  File "C:\Program Files\Python39\lib\selectors.py", line 324, in select
+    r, w, _ = self._select(self._readers, self._writers, [], timeout)
+  File "C:\Program Files\Python39\lib\selectors.py", line 315, in _select
+    r, w, x = select.select(r, w, w, timeout)
+OSError: [WinError 10038] An operation was attempted on something that is not a socket
+ * Restarting with stat
+Traceback (most recent call last):
+  File "C:\projects\smartmap\backend\run.py", line 1, in <module>
+    from app import create_app
+  File "C:\projects\smartmap\backend\app\__init__.py", line 2, in <module>
+    from . import db
+ImportError: cannot import name 'db' from partially initialized module 'app' (most likely due to a circular import) (C:\projects\smartmap\backend\app\__init__.py)

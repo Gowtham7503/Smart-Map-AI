@@ -1,7 +1,7 @@
-﻿﻿import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import polyline from "polyline";
 import axios from "axios";
-import { getRoute } from "../../services/api";
+import { getLowPollutionRoute, getRoute, getCurrentUser } from "../../services/api";
 import MapBottomPanel from "./MapBottomPanel";
 import MapCanvas from "./MapCanvas";
 import PlaceHoverCard from "./PlaceHoverCard";
@@ -39,6 +39,9 @@ const parseRouteDetails = (routeResponse) => {
       safetyScore:
         route.safety_score == null ? null : Number(route.safety_score),
       safetyContext: route.safety_context || null,
+      pollutionScore:
+        route.pollution_score == null ? null : Number(route.pollution_score),
+      pollutionContext: route.pollution_context || null,
       routeSelection: {
         selectedForSafety: Boolean(route.selected_for_safety),
         selectionReason: route.selection_reason || null,
@@ -49,6 +52,12 @@ const parseRouteDetails = (routeResponse) => {
         ),
         safestRouteFallback:
           routeResponse?.metadata?.safest_route_fallback || null,
+        selectedForPollution: Boolean(route.selected_for_pollution),
+        lowPollutionRouteEnabled: Boolean(
+          routeResponse?.metadata?.low_pollution_route_enabled,
+        ),
+        lowPollutionRouteFallback:
+          routeResponse?.metadata?.low_pollution_route_fallback || null,
         selectedRouteStrategy:
           routeResponse?.metadata?.selected_route_strategy || null,
       },
@@ -87,6 +96,7 @@ const MapView = () => {
   const [dragSidebar, setDragSidebar] = useState(false);
   const [dragPanel, setDragPanel] = useState(false);
   const [routeCoords, setRouteCoords] = useState([]);
+  const [user, setUser] = useState(null);
   const [routeSummaries, setRouteSummaries] = useState({
     car: null,
     bike: null,
@@ -204,6 +214,9 @@ const MapView = () => {
     return details.coordinates;
   };
 
+  const getRouteRequest = (activeFilters) =>
+    activeFilters.pollution ? getLowPollutionRoute : getRoute;
+
   const fetchRoute = async (preferredMode = mode) => {
     try {
       if (!from || !to) {
@@ -224,9 +237,10 @@ const MapView = () => {
         [start[1], start[0]],
         [end[1], end[0]],
       ];
+      const requestRoute = getRouteRequest(filters);
       const routeResponses = await Promise.allSettled(
         TRAVEL_MODES.map(async (travelMode) => {
-          const response = await getRoute(coordinates, travelMode, filters);
+          const response = await requestRoute(coordinates, travelMode, filters);
 
           return {
             mode: travelMode,
@@ -262,7 +276,14 @@ const MapView = () => {
         nextRouteDataByMode.walk;
 
       if (!activeRoute) {
-        throw new Error("Unable to fetch route details for any travel mode.");
+        // Extract the actual error from the failed requests to provide a better alert
+        const firstFailure = routeResponses.find((r) => r.status === "rejected");
+        const backendError =
+          firstFailure?.reason?.response?.data?.error ||
+          firstFailure?.reason?.response?.data?.details ||
+          firstFailure?.reason?.message;
+
+        throw new Error(backendError || "Unable to fetch route details for any travel mode.");
       }
 
       setRouteDataByMode(nextRouteDataByMode);
@@ -478,6 +499,18 @@ const MapView = () => {
     setPlaceDetailsLoading(false);
   };
 
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const response = await getCurrentUser();
+        setUser(response.data.user);
+      } catch {
+        console.log("Not logged in or session expired");
+        setUser(null);
+      }
+    };
+    fetchUserData();
+  }, []);
 
   useEffect(() => {
     if (isFirstSafetyEffect.current) {
@@ -490,7 +523,9 @@ const MapView = () => {
     }
 
     fetchRoute(mode);
-  }, [filters.safest]);
+    // Re-run only when route preference filters change; route inputs are read from current state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.safest, filters.pollution, filters.traffic]);
 
   return (
     <div
@@ -510,6 +545,7 @@ const MapView = () => {
         showSidebar={showSidebar}
         sidebarWidth={sidebarWidth}
         to={to}
+        user={user}
       />
 
       {showSidebar && (

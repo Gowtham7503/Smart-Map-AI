@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { loginUser, requestPasswordResetOtp } from "../services/api";
 import "./app.css";
 import smartAccessIllustration from "../assets/smart_access_illustration.svg";
 import {
@@ -10,13 +11,63 @@ import {
   FaArrowRight,
 } from "react-icons/fa";
 
-function App() {
+function SignIn() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [showPassword, setShowPassword] = useState(false);
+  const [formData, setFormData] = useState({
+    email: "",
+    password: "",
+  });
+  const [error, setError] = useState("");
+  const [status, setStatus] = useState(location.state?.message || "");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
 
-  const handleSignIn = (e) => {
-    e.preventDefault();
-    navigate("/dashboard");
+  const handleChange = (event) => {
+    const { name, value } = event.target;
+    setFormData((currentData) => ({
+      ...currentData,
+      [name]: value,
+    }));
+  };
+
+  const handleSignIn = async (event) => {
+    event.preventDefault();
+    setError("");
+    setStatus("");
+
+    try {
+      setIsSubmitting(true);
+      await loginUser(formData);
+      navigate("/dashboard");
+    } catch (err) {
+      setError(err.response?.data?.message || "Unable to sign in.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    setError("");
+    setStatus("");
+    const email = formData.email.trim();
+
+    if (!email) {
+      setError("Enter your email first, then click Forgot Password.");
+      return;
+    }
+
+    try {
+      setIsSendingOtp(true);
+      await requestPasswordResetOtp(email);
+      sessionStorage.setItem("smartmap:password-reset-email", email);
+      navigate("/otp");
+    } catch (err) {
+      setError(err.response?.data?.message || "Unable to send OTP.");
+    } finally {
+      setIsSendingOtp(false);
+    }
   };
 
   return (
@@ -37,12 +88,16 @@ function App() {
           <p className="subtitle">Sign in to continue your journey</p>
 
           <form onSubmit={handleSignIn}>
-            <label>Email / Hallticket Number *</label>
+            <label>Email *</label>
             <div className="input-box">
               <FaUser className="input-icon" />
               <input
-                type="text"
-                placeholder="Enter your email or hallticket number"
+                type="email"
+                name="email"
+                value={formData.email}
+                onChange={handleChange}
+                placeholder="Enter your email"
+                required
               />
             </div>
 
@@ -51,7 +106,11 @@ function App() {
               <FaLock className="input-icon" />
               <input
                 type={showPassword ? "text" : "password"}
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
                 placeholder="Enter your password"
+                required
               />
               {showPassword ? (
                 <FaEyeSlash className="eye-icon" onClick={() => setShowPassword(false)} />
@@ -68,14 +127,17 @@ function App() {
               {/* ✅ UPDATED */}
               <span
                 className="forgot-link"
-                onClick={() => navigate("/otp")}
+                onClick={handleForgotPassword}
               >
-                Forgot Password?
+                {isSendingOtp ? "Sending OTP..." : "Forgot Password?"}
               </span>
             </div>
 
-            <button type="submit" className="auth-submit-btn">
-              Sign In <FaArrowRight />
+            {error && <p className="auth-message auth-error">{error}</p>}
+            {status && <p className="auth-message auth-success">{status}</p>}
+
+            <button type="submit" className="auth-submit-btn" disabled={isSubmitting}>
+              {isSubmitting ? "Signing in..." : "Sign In"} <FaArrowRight />
             </button>
           </form>
 
@@ -95,4 +157,4 @@ function App() {
   );
 }
 
-export default App;
+export default SignIn;
