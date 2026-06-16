@@ -48,6 +48,14 @@ const formatSafetyScore = (score) => {
   return `${score.toFixed(1)} / 6`;
 };
 
+const formatPollutionScore = (score) => {
+  if (score == null) {
+    return "--";
+  }
+
+  return `${score.toFixed(1)} / 5`;
+};
+
 const getSafetyLabel = (score) => {
   if (score == null) {
     return "Available when Safest Route is on";
@@ -128,8 +136,28 @@ const getLightingScoreMessage = (summary) => {
   return `${streetLightCount} street lights and ${mainRoadPercent}% main-road coverage reduced the score by ${lightingBonus.toFixed(1)}`;
 };
 
-const getRouteSelectionMessage = (summary) => {
+const getRouteSelectionMessage = (summary, filters) => {
   const selection = summary?.routeSelection;
+
+  if (filters?.pollution) {
+    if (!selection?.lowPollutionRouteEnabled) {
+      return "Low-pollution selection is off";
+    }
+
+    if (selection.lowPollutionRouteFallback) {
+      return selection.lowPollutionRouteFallback;
+    }
+
+    if ((selection.alternativesReturned || 0) <= 1) {
+      return "Only one route was returned, so there was nothing cleaner to switch to";
+    }
+
+    if (selection.selectedForPollution) {
+      return `Selected the lowest-pollution route from ${selection.alternativesReturned} returned alternatives`;
+    }
+
+    return selection.selectionReason || "Using returned route";
+  }
 
   if (!selection?.safestRouteEnabled) {
     return "Safest-route selection is off";
@@ -148,6 +176,17 @@ const getRouteSelectionMessage = (summary) => {
   }
 
   return selection.selectionReason || "Using returned route";
+};
+
+const getPollutionScoreMessage = (summary) => {
+  const airQualityIndex = summary?.pollutionContext?.air_quality_index;
+  const pollutionPenalty = summary?.pollutionContext?.pollution_penalty;
+
+  if (airQualityIndex == null || pollutionPenalty == null) {
+    return "Air-quality signal not available";
+  }
+
+  return `AQI ${airQualityIndex.toFixed(1)} added ${pollutionPenalty.toFixed(1)} to the route preference`;
 };
 
 const MapBottomPanel = ({
@@ -341,7 +380,20 @@ const MapBottomPanel = ({
                 {routeLoading ? "Checking street lighting..." : getLightingScoreMessage(activeSummary)}
               </span>
               <span className="route-summary-meta route-summary-note">
-                {routeLoading ? "Comparing route options..." : getRouteSelectionMessage(activeSummary)}
+                {routeLoading ? "Comparing route options..." : getRouteSelectionMessage(activeSummary, filters)}
+              </span>
+            </div>
+          )}
+
+          {filters?.pollution && (
+            <div className="route-summary-safety">
+              <p className="route-summary-label">Air quality</p>
+              <strong>{routeLoading ? "Calculating..." : formatPollutionScore(activeSummary?.pollutionScore)}</strong>
+              <span className="route-summary-meta">
+                {routeLoading ? "Checking route air quality..." : getPollutionScoreMessage(activeSummary)}
+              </span>
+              <span className="route-summary-meta route-summary-note">
+                {routeLoading ? "Comparing cleaner route options..." : getRouteSelectionMessage(activeSummary, filters)}
               </span>
             </div>
           )}

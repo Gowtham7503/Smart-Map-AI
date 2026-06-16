@@ -14,8 +14,15 @@ load_dotenv(ENV_PATH)
 
 api = Blueprint("api", __name__)
 
-TRAFFIC_API_KEY = (os.getenv("TRAFFIC_API_KEY") or "").strip()
+TRAGGIC_API_KEY = (os.getenv("TRAGGIC_API_KEY") or os.getenv("TRAFFIC_API_KEY") or "").strip()
+TRAFFIC_API_KEY = (os.getenv("TRAFFIC_API_KEY") or os.getenv("TRAGGIC_API_KEY") or "").strip()
 UNSPLASH_API_KEY = (os.getenv("UNSPLASH_API_KEY") or os.getenv("UNSPLASH_ACCESS_KEY") or "").strip()
+OPENWEATHER_API_KEY = (
+    os.getenv("WEATHER_API_KEY")
+    or os.getenv("OPENWEATHER_API_KEY")
+    or os.getenv("OPENWEATHER_MAP_API_KEY")
+    or ""
+).strip()
 ORS_PROFILES = {
     "car": "driving-car",
     "bike": "cycling-regular",
@@ -23,8 +30,9 @@ ORS_PROFILES = {
 }
 OVERPASS_API_URL = "https://overpass-api.de/api/interpreter"
 TOMTOM_FLOW_URL = "https://api.tomtom.com/traffic/services/4/flowSegmentData/absolute/10/json"
+OPENWEATHER_AIR_POLLUTION_URL = "https://api.openweathermap.org/data/2.5/air_pollution"
 POI_RADIUS_METERS = 500
-POI_SAMPLE_LIMIT = 3
+PI_SAMPLE_LIMIT = 3
 WIKIPEDIA_HEADERS = {
     "User-Agent": "smartmap/1.0 (place details lookup)",
     "Accept": "application/json",
@@ -143,14 +151,23 @@ def decode_polyline(encoded):
     return coordinates
 
 
-def sample_route_points(decoded_coordinates, sample_limit=POI_SAMPLE_LIMIT):
+def sample_route_points(decoded_coordinates, sample_limit=PI_SAMPLE_LIMIT):
     if not decoded_coordinates:
         return []
 
     if len(decoded_coordinates) <= sample_limit:
         return decoded_coordinates
 
-    sample_indexes = {0, len(decoded_coordinates) - 1, len(decoded_coordinates) // 2}
+    target_samples = min(
+        len(decoded_coordinates),
+        max(sample_limit, 5, len(decoded_coordinates) // 20 + 3),
+    )
+
+    if target_samples <= 2:
+        return [decoded_coordinates[0], decoded_coordinates[-1]]
+
+    step = (len(decoded_coordinates) - 1) / (target_samples - 1)
+    sample_indexes = {round(index * step) for index in range(target_samples)}
     return [decoded_coordinates[index] for index in sorted(sample_indexes)]
 
 
@@ -300,6 +317,161 @@ def get_route_traffic_score(route, mode):
     return avg_congestion, road_closures, min(2.5, traffic_penalty)
 
 
+@lru_cache(maxsize=256)
+def fetch_air_pollution_snapshot(lat, lon):
+    if not OPENWEATHER_API_KEY:
+        return None
+
+    response = requests.get(
+        OPENWEATHER_AIR_POLLUTION_URL,
+        params={
+            "lat": lat,
+            "lon": lon,
+            "appid": OPENWEATHER_API_KEY,
+        },
+        timeout=10,
+    )
+    response.raise_for_status()
+
+    entries = response.json().get("list", [])
+    return entries[0] if entries else None
+
+
+def get_route_pollution_score(route, mode):
+    if not OPENWEATHER_API_KEY:
+        return 0, 0, 0
+
+    sampled_points = get_route_sample_points(route)
+
+    if not sampled_points:
+        return 0, 0, 0
+
+    air_quality_values = []
+    polluted_samples = 0
+
+    for lat, lon in sampled_points:
+        try:
+            pollution = fetch_air_pollution_snapshot(
+                round_coordinate(lat),
+                round_coordinate(lon),
+            )
+        except requests.RequestException:
+            continue
+
+        if not pollution:
+            continue
+
+        aqi = pollution.get("main", {}).get("aqi")
+
+        if aqi:
+            air_quality_values.append(aqi)
+            polluted_samples += 1
+
+    if not air_quality_values:
+        return 0, 0, 0
+
+    avg_aqi = round(sum(air_quality_values) / len(air_quality_values), 2)
+
+    if mode == "car":
+        pollution_penalty = round(max(0, (avg_aqi - 1) * 0.8), 2)
+    else:
+        pollution_penalty = round(max(0, (avg_aqi - 1) * 0.6), 2)
+
+    return avg_aqi, polluted_samples, pollution_penalty
+
+
+def score_route_for_pollution(route, mode):
+    air_quality_index, polluted_samples, pollution_penalty = get_route_pollution_score(
+        route,
+        mode,
+    )
+
+    route["pollution_score"] = air_quality_index
+    route["pollution_context"] = {
+        "air_quality_index": air_quality_index,
+        "polluted_samples": polluted_samples,
+        "pollution_penalty": pollution_penalty,
+        "evaluated_hour": datetime.now().hour,
+        "mode": mode,
+    }
+
+    return air_quality_index
+
+
+@api.route("/route/pollution", methods=["POST"])
+def get_low_pollution_route():
+    data = request.get_json(silent=True) or {}
+    coordinates = data.get("coordinates")
+    mode = (data.get("mode") or "car").strip().lower()
+    ors_api_key = get_env_value("ORS_API_KEY")
+
+    if not ors_api_key:
+        return jsonify({"error": "ORS_API_KEY is missing or empty in backend/.env"}), 500
+
+    if not OPENWEATHER_API_KEY:
+        return jsonify({"error": "WEATHER_API_KEY is missing or empty in backend/.env"}), 500
+
+    if not coordinates:
+        return jsonify({"error": "Coordinates are required"}), 400
+
+    profile = ORS_PROFILES.get(mode)
+
+    if not profile:
+        return jsonify({"error": "Unsupported travel mode"}), 400
+
+    request_body = build_route_request_body(coordinates, include_alternatives=True)
+
+    try:
+        route_data = fetch_openrouteservice_route(profile, ors_api_key, request_body)
+    except requests.RequestException as error:
+        details = None
+
+        if error.response is not None:
+            try:
+                details = error.response.json()
+            except ValueError:
+                details = error.response.text
+
+        return (
+            jsonify({"error": "Unable to fetch route", "details": details or str(error)}),
+            502,
+        )
+
+    routes = route_data.get("routes", [])
+
+    if routes:
+        for index, route in enumerate(routes):
+            score_route_for_pollution(route, mode)
+            route["route_rank"] = index + 1
+
+        routes.sort(
+            key=lambda route: (
+                route.get("pollution_score", float("inf")),
+                route.get("summary", {}).get("distance", float("inf")),
+            )
+        )
+
+        for index, route in enumerate(routes):
+            route["selected_for_pollution"] = index == 0
+            route["selection_reason"] = (
+                "Lowest air quality index among returned alternatives"
+                if index == 0
+                else "Alternative route with a higher air quality index"
+            )
+            route["pollution_context"]["alternatives_considered"] = len(routes)
+            route["pollution_context"]["selected_rank"] = index + 1
+
+        route_data["routes"] = routes
+        route_data.setdefault("metadata", {})
+        route_data["metadata"]["low_pollution_route_enabled"] = True
+        route_data["metadata"]["alternatives_returned"] = len(routes)
+        route_data["metadata"]["selected_route_strategy"] = (
+            "Lowest air quality index among returned alternatives"
+        )
+
+    return jsonify(route_data)
+
+
 def get_route_sample_points(route):
     geometry = route.get("geometry")
 
@@ -312,6 +484,39 @@ def get_route_sample_points(route):
         return []
 
     return sample_route_points(decoded_coordinates)
+
+
+def build_route_request_body(coordinates, include_alternatives=False, shortest_route=False):
+    request_body = {
+        "coordinates": coordinates,
+        "extra_info": ["waytype", "steepness"],
+    }
+
+    if shortest_route:
+        request_body["preference"] = "shortest"
+
+    if include_alternatives:
+        request_body["alternative_routes"] = {
+            "target_count": 3,
+            "share_factor": 0.6,
+            "weight_factor": 2,
+        }
+
+    return request_body
+
+
+def fetch_openrouteservice_route(profile, ors_api_key, request_body):
+    response = requests.post(
+        f"https://api.openrouteservice.org/v2/directions/{profile}",
+        json=request_body,
+        headers={
+            "Authorization": ors_api_key,
+            "Content-Type": "application/json",
+        },
+        timeout=20,
+    )
+    response.raise_for_status()
+    return response.json()
 
 
 def score_route_for_safety(route, mode, current_hour):
@@ -389,30 +594,10 @@ def get_route():
     if not profile:
         return jsonify({"error": "Unsupported travel mode"}), 400
 
-    request_body = {
-        "coordinates": coordinates,
-        "extra_info": ["waytype", "steepness"],
-    }
-
-    if is_safe:
-        request_body["alternative_routes"] = {
-            "target_count": 3,
-            "share_factor": 0.6,
-            "weight_factor": 2,
-        }
+    request_body = build_route_request_body(coordinates, include_alternatives=is_safe)
 
     try:
-        response = requests.post(
-            f"https://api.openrouteservice.org/v2/directions/{profile}",
-            json=request_body,
-            headers={
-                "Authorization": ors_api_key,
-                "Content-Type": "application/json",
-            },
-            timeout=20,
-        )
-        response.raise_for_status()
-        route_data = response.json()
+        route_data = fetch_openrouteservice_route(profile, ors_api_key, request_body)
     except requests.RequestException as error:
         should_retry_without_alternatives = (
             is_safe
@@ -496,6 +681,78 @@ def get_route():
         route_data["metadata"]["alternatives_returned"] = len(routes)
         route_data["metadata"]["selected_route_strategy"] = (
             "Lowest safety score returned first"
+        )
+
+    return jsonify(route_data)
+
+
+@api.route("/route/shortest", methods=["POST"])
+def get_shortest_route():
+    data = request.get_json(silent=True) or {}
+    coordinates = data.get("coordinates")
+    mode = (data.get("mode") or "car").strip().lower()
+    ors_api_key = get_env_value("ORS_API_KEY")
+    shortest_key = TRAGGIC_API_KEY or TRAFFIC_API_KEY
+
+    if not shortest_key:
+        return jsonify({"error": "TRAGGIC_API_KEY is missing or empty in backend/.env"}), 500
+
+    if not ors_api_key:
+        return jsonify({"error": "ORS_API_KEY is missing or empty in backend/.env"}), 500
+
+    if not coordinates:
+        return jsonify({"error": "Coordinates are required"}), 400
+
+    profile = ORS_PROFILES.get(mode)
+
+    if not profile:
+        return jsonify({"error": "Unsupported travel mode"}), 400
+
+    request_body = build_route_request_body(
+        coordinates,
+        include_alternatives=True,
+        shortest_route=True,
+    )
+
+    try:
+        route_data = fetch_openrouteservice_route(profile, ors_api_key, request_body)
+
+        routes = route_data.get("routes", [])
+
+        if routes:
+            routes.sort(
+                key=lambda route: route.get("summary", {}).get("distance", float("inf"))
+            )
+
+            for index, route in enumerate(routes):
+                route["route_rank"] = index + 1
+                route["selected_for_shortest"] = index == 0
+                route["selection_reason"] = (
+                    "Shortest distance among returned alternatives"
+                    if index == 0
+                    else "Alternative route with a longer distance"
+                )
+
+        route_data["routes"] = routes
+        route_data.setdefault("metadata", {})
+        route_data["metadata"]["shortest_route_enabled"] = True
+        route_data["metadata"]["shortest_route_source"] = "TRAGGIC_API_KEY"
+        route_data["metadata"]["alternatives_returned"] = len(routes)
+        route_data["metadata"]["selected_route_strategy"] = (
+            "Shortest distance among returned alternatives"
+        )
+    except requests.RequestException as error:
+        details = None
+
+        if error.response is not None:
+            try:
+                details = error.response.json()
+            except ValueError:
+                details = error.response.text
+
+        return (
+            jsonify({"error": "Unable to fetch shortest route", "details": details or str(error)}),
+            502,
         )
 
     return jsonify(route_data)

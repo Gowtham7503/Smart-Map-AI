@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import polyline from "polyline";
 import axios from "axios";
-import { getRoute, getCurrentUser } from "../../services/api";
+import { getLowPollutionRoute, getRoute, getCurrentUser } from "../../services/api";
 import MapBottomPanel from "./MapBottomPanel";
 import MapCanvas from "./MapCanvas";
 import PlaceHoverCard from "./PlaceHoverCard";
@@ -39,6 +39,9 @@ const parseRouteDetails = (routeResponse) => {
       safetyScore:
         route.safety_score == null ? null : Number(route.safety_score),
       safetyContext: route.safety_context || null,
+      pollutionScore:
+        route.pollution_score == null ? null : Number(route.pollution_score),
+      pollutionContext: route.pollution_context || null,
       routeSelection: {
         selectedForSafety: Boolean(route.selected_for_safety),
         selectionReason: route.selection_reason || null,
@@ -49,6 +52,12 @@ const parseRouteDetails = (routeResponse) => {
         ),
         safestRouteFallback:
           routeResponse?.metadata?.safest_route_fallback || null,
+        selectedForPollution: Boolean(route.selected_for_pollution),
+        lowPollutionRouteEnabled: Boolean(
+          routeResponse?.metadata?.low_pollution_route_enabled,
+        ),
+        lowPollutionRouteFallback:
+          routeResponse?.metadata?.low_pollution_route_fallback || null,
         selectedRouteStrategy:
           routeResponse?.metadata?.selected_route_strategy || null,
       },
@@ -205,6 +214,9 @@ const MapView = () => {
     return details.coordinates;
   };
 
+  const getRouteRequest = (activeFilters) =>
+    activeFilters.pollution ? getLowPollutionRoute : getRoute;
+
   const fetchRoute = async (preferredMode = mode) => {
     try {
       if (!from || !to) {
@@ -225,9 +237,10 @@ const MapView = () => {
         [start[1], start[0]],
         [end[1], end[0]],
       ];
+      const requestRoute = getRouteRequest(filters);
       const routeResponses = await Promise.allSettled(
         TRAVEL_MODES.map(async (travelMode) => {
-          const response = await getRoute(coordinates, travelMode, filters);
+          const response = await requestRoute(coordinates, travelMode, filters);
 
           return {
             mode: travelMode,

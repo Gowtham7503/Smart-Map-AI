@@ -10,7 +10,7 @@ import {
   FaEye,
   FaEyeSlash,
   FaLock,
-  FaUser,
+  FaUser
 } from "react-icons/fa";
 
 const getPasswordChecks = (password) => [

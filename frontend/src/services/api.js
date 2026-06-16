@@ -9,6 +9,14 @@ export const getRoute = (coordinates, mode = "car", filters = {}) => {
   return API.post("/route", { coordinates, mode, filters });
 };
 
+export const getLowPollutionRoute = (coordinates, mode = "car", filters = {}) => {
+  return API.post("/route/pollution", { coordinates, mode, filters });
+};
+
+export const getShortestRoute = (coordinates, mode = "car") => {
+  return API.post("/route/shortest", { coordinates, mode });
+};
+
 export const registerUser = (userData) => {
   return API.post("/auth/register", userData);
 };
