@@ -46,6 +46,18 @@ def get_env_value(name):
     return (value or "").strip()
 
 
+def get_openweather_api_key():
+    return (
+        get_env_value("WEATHER_API_KEY")
+        or get_env_value("OPENWEATHER_API_KEY")
+        or get_env_value("OPENWEATHER_MAP_API_KEY")
+    )
+
+
+def get_traffic_api_key():
+    return get_env_value("TRAFFIC_API_KEY") or get_env_value("TRAGGIC_API_KEY")
+
+
 def calculate_waytype_safety_score(waytype_summary):
     if not waytype_summary:
         return 0
@@ -253,13 +265,15 @@ def get_route_lighting_score(overpass_street_light_ids, waytype_summary):
 
 @lru_cache(maxsize=256)
 def fetch_traffic_snapshot(lat, lon):
-    if not TRAFFIC_API_KEY:
+    traffic_api_key = get_traffic_api_key()
+
+    if not traffic_api_key:
         return None
 
     response = requests.get(
         TOMTOM_FLOW_URL,
         params={
-            "key": TRAFFIC_API_KEY,
+            "key": traffic_api_key,
             "point": f"{lat},{lon}",
             "unit": "KMPH",
             "thickness": 10,
@@ -271,7 +285,7 @@ def fetch_traffic_snapshot(lat, lon):
 
 
 def get_route_traffic_score(route, mode):
-    if not TRAFFIC_API_KEY:
+    if not get_traffic_api_key():
         return 0, 0, 0
 
     sampled_points = get_route_sample_points(route)
@@ -317,9 +331,26 @@ def get_route_traffic_score(route, mode):
     return avg_congestion, road_closures, min(2.5, traffic_penalty)
 
 
+def score_route_for_traffic(route, mode):
+    traffic_congestion, road_closures, traffic_penalty = get_route_traffic_score(route, mode)
+
+    route["traffic_score"] = traffic_penalty
+    route["traffic_context"] = {
+        "traffic_congestion": traffic_congestion,
+        "traffic_penalty": traffic_penalty,
+        "road_closures": road_closures,
+        "evaluated_hour": datetime.now().hour,
+        "mode": mode,
+    }
+
+    return traffic_penalty
+
+
 @lru_cache(maxsize=256)
 def fetch_air_pollution_snapshot(lat, lon):
-    if not OPENWEATHER_API_KEY:
+    openweather_api_key = get_openweather_api_key()
+
+    if not openweather_api_key:
         return None
 
     response = requests.get(
@@ -327,7 +358,7 @@ def fetch_air_pollution_snapshot(lat, lon):
         params={
             "lat": lat,
             "lon": lon,
-            "appid": OPENWEATHER_API_KEY,
+            "appid": openweather_api_key,
         },
         timeout=10,
     )
@@ -338,7 +369,7 @@ def fetch_air_pollution_snapshot(lat, lon):
 
 
 def get_route_pollution_score(route, mode):
-    if not OPENWEATHER_API_KEY:
+    if not get_openweather_api_key():
         return 0, 0, 0
 
     sampled_points = get_route_sample_points(route)
@@ -404,12 +435,10 @@ def get_low_pollution_route():
     coordinates = data.get("coordinates")
     mode = (data.get("mode") or "car").strip().lower()
     ors_api_key = get_env_value("ORS_API_KEY")
+    openweather_api_key = get_openweather_api_key()
 
     if not ors_api_key:
         return jsonify({"error": "ORS_API_KEY is missing or empty in backend/.env"}), 500
-
-    if not OPENWEATHER_API_KEY:
-        return jsonify({"error": "WEATHER_API_KEY is missing or empty in backend/.env"}), 500
 
     if not coordinates:
         return jsonify({"error": "Coordinates are required"}), 400
@@ -419,23 +448,50 @@ def get_low_pollution_route():
     if not profile:
         return jsonify({"error": "Unsupported travel mode"}), 400
 
-    request_body = build_route_request_body(coordinates, include_alternatives=True)
+    can_score_pollution = bool(openweather_api_key)
+    request_body = build_route_request_body(
+        coordinates,
+        include_alternatives=can_score_pollution,
+    )
 
     try:
         route_data = fetch_openrouteservice_route(profile, ors_api_key, request_body)
     except requests.RequestException as error:
-        details = None
-
-        if error.response is not None:
-            try:
-                details = error.response.json()
-            except ValueError:
-                details = error.response.text
-
-        return (
-            jsonify({"error": "Unable to fetch route", "details": details or str(error)}),
-            502,
+        should_retry_without_alternatives = (
+            can_score_pollution
+            and error.response is not None
+            and error.response.status_code == 400
         )
+
+        if not should_retry_without_alternatives:
+            return (
+                jsonify({"error": "Unable to fetch route", "details": get_request_error_details(error)}),
+                502,
+            )
+
+        fallback_body = build_route_request_body(coordinates)
+
+        try:
+            route_data = fetch_openrouteservice_route(profile, ors_api_key, fallback_body)
+            route_data.setdefault("metadata", {})
+            route_data["metadata"]["low_pollution_route_fallback"] = (
+                "Alternative routes unavailable for this request. "
+                "Showing the default route with available pollution scoring."
+            )
+        except requests.RequestException as retry_error:
+            return (
+                jsonify({"error": "Unable to fetch route", "details": get_request_error_details(retry_error)}),
+                502,
+            )
+
+    if not can_score_pollution:
+        route_data.setdefault("metadata", {})
+        route_data["metadata"]["low_pollution_route_enabled"] = False
+        route_data["metadata"]["low_pollution_route_fallback"] = (
+            "OpenWeather API key is missing, so pollution scoring is unavailable. "
+            "Showing the default route."
+        )
+        return jsonify(route_data)
 
     routes = route_data.get("routes", [])
 
@@ -519,6 +575,16 @@ def fetch_openrouteservice_route(profile, ors_api_key, request_body):
     return response.json()
 
 
+def get_request_error_details(error):
+    if error.response is None:
+        return str(error)
+
+    try:
+        return error.response.json()
+    except ValueError:
+        return error.response.text
+
+
 def score_route_for_safety(route, mode, current_hour):
     route_extras = route.get("extras") or route.get("extra_info") or {}
     waytype_summary = route_extras.get("waytype", {}).get("summary", [])
@@ -581,7 +647,9 @@ def get_route():
     mode = (data.get("mode") or "car").strip().lower()
     filters = data.get("filters") or {}
     is_safe = bool(filters.get("safest", False))
+    avoid_traffic = bool(filters.get("traffic", False))
     ors_api_key = get_env_value("ORS_API_KEY")
+    can_score_traffic = bool(get_traffic_api_key())
 
     if not ors_api_key:
         return jsonify({"error": "ORS_API_KEY is missing or empty in backend/.env"}), 500
@@ -594,13 +662,16 @@ def get_route():
     if not profile:
         return jsonify({"error": "Unsupported travel mode"}), 400
 
-    request_body = build_route_request_body(coordinates, include_alternatives=is_safe)
+    request_body = build_route_request_body(
+        coordinates,
+        include_alternatives=is_safe or (avoid_traffic and can_score_traffic),
+    )
 
     try:
         route_data = fetch_openrouteservice_route(profile, ors_api_key, request_body)
     except requests.RequestException as error:
         should_retry_without_alternatives = (
-            is_safe
+            (is_safe or (avoid_traffic and can_score_traffic))
             and error.response is not None
             and error.response.status_code == 400
         )
@@ -637,10 +708,14 @@ def get_route():
             response.raise_for_status()
             route_data = response.json()
             route_data.setdefault("metadata", {})
-            route_data["metadata"]["safest_route_fallback"] = (
+            fallback_message = (
                 "Alternative routes unavailable for this request. "
-                "Showing the safest score for the default route."
+                "Showing the default route with available scoring."
             )
+            if is_safe:
+                route_data["metadata"]["safest_route_fallback"] = fallback_message
+            if avoid_traffic:
+                route_data["metadata"]["traffic_route_fallback"] = fallback_message
         except requests.RequestException as retry_error:
             details = None
 
@@ -654,6 +729,14 @@ def get_route():
                 jsonify({"error": "Unable to fetch route", "details": details or str(retry_error)}),
                 502,
             )
+
+    if avoid_traffic and not can_score_traffic:
+        route_data.setdefault("metadata", {})
+        route_data["metadata"]["traffic_route_enabled"] = False
+        route_data["metadata"]["traffic_route_fallback"] = (
+            "Traffic API key is missing, so live traffic selection is unavailable. "
+            "Showing the default route."
+        )
 
     if is_safe:
         current_hour = datetime.now().hour
@@ -681,6 +764,39 @@ def get_route():
         route_data["metadata"]["alternatives_returned"] = len(routes)
         route_data["metadata"]["selected_route_strategy"] = (
             "Lowest safety score returned first"
+        )
+
+    if avoid_traffic and can_score_traffic:
+        routes = route_data.get("routes", [])
+
+        for index, route in enumerate(routes):
+            score_route_for_traffic(route, mode)
+            route["route_rank"] = index + 1
+
+        routes.sort(
+            key=lambda route: (
+                route.get("traffic_score", float("inf")),
+                route.get("summary", {}).get("duration", float("inf")),
+                route.get("summary", {}).get("distance", float("inf")),
+            )
+        )
+
+        for index, route in enumerate(routes):
+            route["selected_for_traffic"] = index == 0
+            route["selection_reason"] = (
+                "Lowest live-traffic penalty among returned alternatives"
+                if index == 0
+                else "Alternative route with higher live-traffic penalty"
+            )
+            route["traffic_context"]["alternatives_considered"] = len(routes)
+            route["traffic_context"]["selected_rank"] = index + 1
+
+        route_data["routes"] = routes
+        route_data.setdefault("metadata", {})
+        route_data["metadata"]["traffic_route_enabled"] = True
+        route_data["metadata"]["alternatives_returned"] = len(routes)
+        route_data["metadata"]["selected_route_strategy"] = (
+            "Lowest live-traffic penalty returned first"
         )
 
     return jsonify(route_data)

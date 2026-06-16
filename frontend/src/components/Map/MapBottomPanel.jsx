@@ -104,9 +104,10 @@ const getCrowdScoreMessage = (summary) => {
 };
 
 const getTrafficScoreMessage = (summary) => {
-  const trafficPenalty = summary?.safetyContext?.traffic_penalty;
-  const trafficCongestion = summary?.safetyContext?.traffic_congestion;
-  const roadClosures = summary?.safetyContext?.road_closures;
+  const trafficContext = summary?.trafficContext || summary?.safetyContext;
+  const trafficPenalty = trafficContext?.traffic_penalty;
+  const trafficCongestion = trafficContext?.traffic_congestion;
+  const roadClosures = trafficContext?.road_closures;
 
   if (trafficPenalty == null) {
     return "Traffic signal not available";
@@ -138,6 +139,26 @@ const getLightingScoreMessage = (summary) => {
 
 const getRouteSelectionMessage = (summary, filters) => {
   const selection = summary?.routeSelection;
+
+  if (filters?.traffic) {
+    if (!selection?.trafficRouteEnabled) {
+      return selection?.trafficRouteFallback || "Live-traffic selection is off";
+    }
+
+    if (selection.trafficRouteFallback) {
+      return selection.trafficRouteFallback;
+    }
+
+    if ((selection.alternativesReturned || 0) <= 1) {
+      return "Only one route was returned, so there was nothing lower-traffic to switch to";
+    }
+
+    if (selection.selectedForTraffic) {
+      return `Selected the lowest-traffic route from ${selection.alternativesReturned} returned alternatives`;
+    }
+
+    return selection.selectionReason || "Using returned route";
+  }
 
   if (filters?.pollution) {
     if (!selection?.lowPollutionRouteEnabled) {
@@ -394,6 +415,16 @@ const MapBottomPanel = ({
               </span>
               <span className="route-summary-meta route-summary-note">
                 {routeLoading ? "Comparing cleaner route options..." : getRouteSelectionMessage(activeSummary, filters)}
+              </span>
+            </div>
+          )}
+
+          {filters?.traffic && (
+            <div className="route-summary-safety">
+              <p className="route-summary-label">Traffic</p>
+              <strong>{routeLoading ? "Calculating..." : getTrafficScoreMessage(activeSummary)}</strong>
+              <span className="route-summary-meta route-summary-note">
+                {routeLoading ? "Comparing lower-traffic route options..." : getRouteSelectionMessage(activeSummary, filters)}
               </span>
             </div>
           )}
