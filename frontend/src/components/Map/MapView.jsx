@@ -14,6 +14,69 @@ const defaultCenter = [17.4948, 78.3996];
 const LAST_SEARCH_STORAGE_KEY = "smartmap:last-search";
 const TRAVEL_MODES = ["car", "bike", "walk"];
 
+const getOrderedTravelModes = (preferredMode) => [
+  preferredMode,
+  ...TRAVEL_MODES.filter((travelMode) => travelMode !== preferredMode),
+];
+
+const formatBackendError = (details, seen = new WeakSet()) => {
+  if (!details) {
+    return "";
+  }
+
+  if (typeof details === "string") {
+    return details;
+  }
+
+  if (Array.isArray(details)) {
+    return details
+      .map((detail) => formatBackendError(detail, seen))
+      .filter(Boolean)
+      .join(" ");
+  }
+
+  if (typeof details === "object") {
+    if (seen.has(details)) {
+      return "";
+    }
+
+    seen.add(details);
+
+    const nestedMessage =
+      formatBackendError(details.message, seen) ||
+      formatBackendError(details.error, seen) ||
+      formatBackendError(details.detail, seen);
+
+    if (nestedMessage) {
+      return nestedMessage;
+    }
+
+    try {
+      return JSON.stringify(details);
+    } catch {
+      return "";
+    }
+  }
+
+  return String(details);
+};
+
+const getRouteFailureMessage = (failure) => {
+  const errorData = failure?.reason?.response?.data;
+  const status = failure?.reason?.response?.status;
+  const backendError =
+    formatBackendError(errorData?.details) ||
+    formatBackendError(errorData?.error) ||
+    formatBackendError(errorData) ||
+    formatBackendError(failure?.reason?.message);
+
+  if (backendError && status) {
+    return `${backendError} (HTTP ${status})`;
+  }
+
+  return backendError || "Unable to fetch route details for any travel mode.";
+};
+
 const geocodePlaceWithNominatim = async (place) => {
   const res = await axios.get(
     `https://nominatim.openstreetmap.org/search?format=json&polygon_geojson=1&q=${encodeURIComponent(place)}`,
@@ -42,6 +105,9 @@ const parseRouteDetails = (routeResponse) => {
       pollutionScore:
         route.pollution_score == null ? null : Number(route.pollution_score),
       pollutionContext: route.pollution_context || null,
+      trafficScore:
+        route.traffic_score == null ? null : Number(route.traffic_score),
+      trafficContext: route.traffic_context || null,
       routeSelection: {
         selectedForSafety: Boolean(route.selected_for_safety),
         selectionReason: route.selection_reason || null,
@@ -58,6 +124,12 @@ const parseRouteDetails = (routeResponse) => {
         ),
         lowPollutionRouteFallback:
           routeResponse?.metadata?.low_pollution_route_fallback || null,
+        selectedForTraffic: Boolean(route.selected_for_traffic),
+        trafficRouteEnabled: Boolean(
+          routeResponse?.metadata?.traffic_route_enabled,
+        ),
+        trafficRouteFallback:
+          routeResponse?.metadata?.traffic_route_fallback || null,
         selectedRouteStrategy:
           routeResponse?.metadata?.selected_route_strategy || null,
       },
@@ -215,7 +287,7 @@ const MapView = () => {
   };
 
   const getRouteRequest = (activeFilters) =>
-    activeFilters.pollution ? getLowPollutionRoute : getRoute;
+    activeFilters.pollution && !activeFilters.traffic ? getLowPollutionRoute : getRoute;
 
   const fetchRoute = async (preferredMode = mode) => {
     try {
@@ -238,16 +310,27 @@ const MapView = () => {
         [end[1], end[0]],
       ];
       const requestRoute = getRouteRequest(filters);
-      const routeResponses = await Promise.allSettled(
-        TRAVEL_MODES.map(async (travelMode) => {
+      const routeResponses = [];
+      const orderedTravelModes = getOrderedTravelModes(preferredMode);
+
+      for (const travelMode of orderedTravelModes) {
+        try {
           const response = await requestRoute(coordinates, travelMode, filters);
 
-          return {
-            mode: travelMode,
-            ...parseRouteDetails(response.data),
-          };
-        }),
-      );
+          routeResponses.push({
+            status: "fulfilled",
+            value: {
+              mode: travelMode,
+              ...parseRouteDetails(response.data),
+            },
+          });
+        } catch (reason) {
+          routeResponses.push({
+            status: "rejected",
+            reason,
+          });
+        }
+      }
 
       const nextRouteDataByMode = {
         car: null,
@@ -278,12 +361,7 @@ const MapView = () => {
       if (!activeRoute) {
         // Extract the actual error from the failed requests to provide a better alert
         const firstFailure = routeResponses.find((r) => r.status === "rejected");
-        const backendError =
-          firstFailure?.reason?.response?.data?.error ||
-          firstFailure?.reason?.response?.data?.details ||
-          firstFailure?.reason?.message;
-
-        throw new Error(backendError || "Unable to fetch route details for any travel mode.");
+        throw new Error(getRouteFailureMessage(firstFailure));
       }
 
       setRouteDataByMode(nextRouteDataByMode);
