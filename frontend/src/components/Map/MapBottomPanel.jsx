@@ -137,10 +137,22 @@ const getLightingScoreMessage = (summary) => {
   return `${streetLightCount} street lights and ${mainRoadPercent}% main-road coverage reduced the score by ${lightingBonus.toFixed(1)}`;
 };
 
-const getRouteSelectionMessage = (summary, filters) => {
+const getRouteSelectionMessage = (summary, filters, filterType) => {
   const selection = summary?.routeSelection;
 
-  if (filters?.traffic) {
+  if (
+    filters?.traffic &&
+    filters?.pollution &&
+    selection?.combinedEnvironmentRouteEnabled
+  ) {
+    if (selection.selectedForCombinedEnvironment) {
+      return `Selected the best combined traffic and pollution route from ${selection.alternativesReturned} alternatives`;
+    }
+
+    return selection.selectedRouteStrategy || "Using the best combined environmental route";
+  }
+
+  if (filterType === "traffic") {
     if (!selection?.trafficRouteEnabled) {
       return selection?.trafficRouteFallback || "Live-traffic selection is off";
     }
@@ -160,7 +172,7 @@ const getRouteSelectionMessage = (summary, filters) => {
     return selection.selectionReason || "Using returned route";
   }
 
-  if (filters?.pollution) {
+  if (filterType === "pollution") {
     if (!selection?.lowPollutionRouteEnabled) {
       return "Low-pollution selection is off";
     }
@@ -401,7 +413,7 @@ const MapBottomPanel = ({
                 {routeLoading ? "Checking street lighting..." : getLightingScoreMessage(activeSummary)}
               </span>
               <span className="route-summary-meta route-summary-note">
-                {routeLoading ? "Comparing route options..." : getRouteSelectionMessage(activeSummary, filters)}
+                {routeLoading ? "Comparing route options..." : getRouteSelectionMessage(activeSummary, filters, "safety")}
               </span>
             </div>
           )}
@@ -414,7 +426,7 @@ const MapBottomPanel = ({
                 {routeLoading ? "Checking route air quality..." : getPollutionScoreMessage(activeSummary)}
               </span>
               <span className="route-summary-meta route-summary-note">
-                {routeLoading ? "Comparing cleaner route options..." : getRouteSelectionMessage(activeSummary, filters)}
+                {routeLoading ? "Comparing cleaner route options..." : getRouteSelectionMessage(activeSummary, filters, "pollution")}
               </span>
             </div>
           )}
@@ -424,7 +436,7 @@ const MapBottomPanel = ({
               <p className="route-summary-label">Traffic</p>
               <strong>{routeLoading ? "Calculating..." : getTrafficScoreMessage(activeSummary)}</strong>
               <span className="route-summary-meta route-summary-note">
-                {routeLoading ? "Comparing lower-traffic route options..." : getRouteSelectionMessage(activeSummary, filters)}
+                {routeLoading ? "Comparing lower-traffic route options..." : getRouteSelectionMessage(activeSummary, filters, "traffic")}
               </span>
             </div>
           )}

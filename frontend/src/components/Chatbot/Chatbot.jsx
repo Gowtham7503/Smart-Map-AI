@@ -1,27 +1,72 @@
-﻿import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { getChatbotRecommendations } from "../../services/api";
 import "./Chatbot.css";
 
-const Chatbot = ({ onClose }) => {
+const QUICK_PROMPTS = [
+  "Famous places nearby",
+  "Restaurants around here",
+  "Temples nearby",
+];
+
+const Chatbot = ({
+  locationLabel,
+  mapPosition,
+  onClose,
+  onPlaceSelect,
+}) => {
   const [messages, setMessages] = useState([
-    { text: "Hi there. How can I help you today?", sender: "bot" },
+    {
+      text: "Hi! I can recommend restaurants, temples, cafés, parks, museums, and famous places near the map.",
+      sender: "bot",
+    },
   ]);
   const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const messagesEndRef = useRef(null);
 
-  const sendMessage = () => {
-    if (!input.trim()) return;
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, loading]);
 
-    const userMessage = { text: input, sender: "user" };
+  const sendMessage = async (messageText = input) => {
+    const trimmedMessage = messageText.trim();
+    if (!trimmedMessage || loading) return;
 
-    setMessages((prev) => [...prev, userMessage]);
-
-    setTimeout(() => {
-      setMessages((prev) => [
-        ...prev,
-        { text: "I am working on that for you.", sender: "bot" },
-      ]);
-    }, 500);
-
+    setMessages((previousMessages) => [
+      ...previousMessages,
+      { text: trimmedMessage, sender: "user" },
+    ]);
     setInput("");
+    setLoading(true);
+
+    try {
+      const response = await getChatbotRecommendations(
+        trimmedMessage,
+        mapPosition,
+        locationLabel,
+      );
+      setMessages((previousMessages) => [
+        ...previousMessages,
+        {
+          text: response.data.reply,
+          sender: "bot",
+          recommendations: response.data.recommendations || [],
+        },
+      ]);
+    } catch (error) {
+      setMessages((previousMessages) => [
+        ...previousMessages,
+        {
+          text:
+            error.response?.data?.reply ||
+            error.response?.data?.error ||
+            "I could not load nearby recommendations. Please try again.",
+          sender: "bot",
+        },
+      ]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -31,7 +76,7 @@ const Chatbot = ({ onClose }) => {
           <span className="chatbot-title-badge">AI</span>
           <div>
             <strong>SmartChat</strong>
-            <p>Your route assistant</p>
+            <p>Your local guide</p>
           </div>
         </div>
         <button
@@ -45,26 +90,64 @@ const Chatbot = ({ onClose }) => {
       </div>
 
       <div className="chatbot-messages">
-        {messages.map((msg, index) => (
-          <div key={index} className={`chatbot-message ${msg.sender}`}>
-            {msg.text}
+        {messages.map((message, index) => (
+          <div key={index} className={`chatbot-message ${message.sender}`}>
+            <span>{message.text}</span>
+            {message.recommendations?.length > 0 && (
+              <div className="chatbot-recommendations">
+                {message.recommendations.map((place) => (
+                  <button
+                   className="chatbot-place-card"
+                    key={`${place.name}-${place.latitude}-${place.longitude}`}
+                    onClick={() => onPlaceSelect(place)}
+                    type="button"
+                  >
+                    <strong>{place.name}</strong>
+                    <span>{place.description}</span>
+                    <small>{place.distance_km} km away</small>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         ))}
+        {loading && (
+          <div className="chatbot-message bot chatbot-typing">
+            Finding nearby places…
+          </div>
+        )}
+        <div ref={messagesEndRef} />
       </div>
+
+      {messages.length === 1 && (
+        <div className="chatbot-quick-prompts">
+          {QUICK_PROMPTS.map((prompt) => (
+            <button
+              key={prompt}
+              onClick={() => sendMessage(prompt)}
+              type="button"
+            >
+              {prompt}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="chatbot-input">
         <input
           type="text"
-          placeholder="Ask something..."
+          placeholder="Ask for nearby places..."
           value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && sendMessage()}
+          onChange={(event) => setInput(event.target.value)}
+          onKeyDown={(event) => event.key === "Enter" && sendMessage()}
+          disabled={loading}
         />
         <button
           className="chatbot-send-btn"
-          onClick={sendMessage}
+          onClick={() => sendMessage()}
           type="button"
           aria-label="Send message"
+          disabled={loading || !input.trim()}
         >
           Send
         </button>

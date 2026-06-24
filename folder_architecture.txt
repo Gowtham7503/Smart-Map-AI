@@ -1,70 +1,75 @@
 ﻿﻿smartmap/
-├── frontend/                     # React + Vite app
+├── frontend/                           # React + Vite Frontend
 │   ├── public/
 │   │   ├── favicon.svg
 │   │   └── icons.svg
+│   │
 │   ├── src/
 │   │   ├── assets/
 │   │   │   ├── mapbright.png
 │   │   │   ├── Register.svg
 │   │   │   ├── smart_access_illustration.svg
 │   │   │   └── smartmaps_logo.svg
+│   │   │
 │   │   ├── components/
 │   │   │   ├── Chatbot/
-│   │   │   │   ├── Chatbot.css
-│   │   │   │   └── Chatbot.jsx
+│   │   │   │   ├── Chatbot.jsx
+│   │   │   │   └── Chatbot.css
+│   │   │   │
 │   │   │   ├── Map/
-│   │   │   │   ├── MapBottomPanel.jsx
-│   │   │   │   ├── MapCanvas.jsx
-│   │   │   │   ├── Map.css
-│   │   │   │   ├── MapSearchBar.jsx
-│   │   │   │   ├── MapSidebar.jsx
 │   │   │   │   ├── MapView.jsx
-│   │   │   │   └── PlaceHoverCard.jsx
+│   │   │   │   ├── MapCanvas.jsx
+│   │   │   │   ├── MapSidebar.jsx
+│   │   │   │   ├── MapSearchBar.jsx
+│   │   │   │   ├── MapBottomPanel.jsx
+│   │   │   │   ├── PlaceHoverCard.jsx
+│   │   │   │   └── Map.css
+│   │   │   │
 │   │   │   ├── Route/
-│   │   │   │   ├── Route.css
-│   │   │   │   └── RouteForm.jsx
-│   │   │   ├── UI/
-│   │   │   │   ├── Button.css
-│   │   │   │   ├── Button.jsx
-│   │   │   │   └── Loader.jsx
-│   │   │   ├── Auth/
-│   │   │       ├── OtpInput.jsx
-│   │   │       └── AuthCard.jsx
+│   │   │   │   ├── RouteForm.jsx
+│   │   │   │   └── Route.css
+│   │   │   │
+│   │   │   └── UI/
+│   │   │       ├── Button.jsx
+│   │   │       ├── Button.css
+│   │   │       └── Loader.jsx
+│   │   │
 │   │   ├── pages/
-│   │   │   ├── Dashboard.jsx
-│   │   │   ├── Home.css
 │   │   │   ├── Home.jsx
-│   │   │   ├── SignIn.jsx
-│   │   │   ├── Register.jsx
-│   │   │   ├── OTP.jsx
-│   │   │   ├── Otp.css
+│   │   │   ├── Home.css
+│   │   │   ├── Dashboard.jsx
 │   │   │   └── app.css
+│   │   │
 │   │   ├── services/
-│   │   │   ├── api.js
-│   │   │   └── authService.js
-│   │   ├── App.css
+│   │   │   └── api.js
+│   │   │
 │   │   ├── App.jsx
+│   │   ├── App.css
 │   │   ├── index.css
 │   │   └── main.jsx
-│   ├── eslint.config.js
+│   │
 │   ├── index.html
-│   ├── package-lock.json
 │   ├── package.json
-│   ├── README.md
-│   └── vite.config.js
-├── backend/                      # Flask app
+│   ├── package-lock.json
+│   ├── vite.config.js
+│   ├── eslint.config.js
+│   └── README.md
+│
+├── backend/                            # Flask Backend
 │   ├── app/
 │   │   ├── routes/
-│   │   │   ├── route_api.py
-│   │   │   └── auth_api.py
+│   │   │   └── route_api.py
+│   │   │
 │   │   ├── services/
-│   │   │   ├── otp_service.py
-│   │   │   └── user_service.py
-│   │   ├── utils/
-│   │   │   └── mailer.py
+│   │   │   └── route_service.py
+│   │   │
 │   │   ├── db.py
 │   │   └── __init__.py
+│   │
 │   └── run.py
+│
+├── node_modules/                       # Root dependencies
+│   └── react-icons/
+│
 ├── .gitignore
 └── folder_architecture.txt

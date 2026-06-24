@@ -3,6 +3,7 @@ import os
 from flask import Flask
 
 from app.routes.auth_api import auth_bp
+from app.routes.chatbot_api import chatbot_bp
 from app.routes.route_api import api
 
 
@@ -12,4 +13,5 @@ def create_app():
 
     app.register_blueprint(api, url_prefix="/api")
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
+    app.register_blueprint(chatbot_bp, url_prefix="/api/chatbot")
     return app

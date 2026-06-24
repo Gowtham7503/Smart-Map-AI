@@ -1,4 +1,5 @@
 from flask import Blueprint, jsonify, request
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from functools import lru_cache
 import os
@@ -32,7 +33,11 @@ OVERPASS_API_URL = "https://overpass-api.de/api/interpreter"
 TOMTOM_FLOW_URL = "https://api.tomtom.com/traffic/services/4/flowSegmentData/absolute/10/json"
 OPENWEATHER_AIR_POLLUTION_URL = "https://api.openweathermap.org/data/2.5/air_pollution"
 POI_RADIUS_METERS = 500
-PI_SAMPLE_LIMIT = 3
+ROUTE_SAMPLE_LIMIT = 5
+SCORING_WORKERS = 5
+EXTERNAL_API_TIMEOUT = (2, 4)
+OVERPASS_TIMEOUT = (2, 5)
+ORS_TIMEOUT = (3, 12)
 WIKIPEDIA_HEADERS = {
     "User-Agent": "smartmap/1.0 (place details lookup)",
     "Accept": "application/json",
@@ -163,17 +168,14 @@ def decode_polyline(encoded):
     return coordinates
 
 
-def sample_route_points(decoded_coordinates, sample_limit=PI_SAMPLE_LIMIT):
+def sample_route_points(decoded_coordinates, sample_limit=ROUTE_SAMPLE_LIMIT):
     if not decoded_coordinates:
         return []
 
     if len(decoded_coordinates) <= sample_limit:
         return decoded_coordinates
 
-    target_samples = min(
-        len(decoded_coordinates),
-        max(sample_limit, 5, len(decoded_coordinates) // 20 + 3),
-    )
+    target_samples = min(len(decoded_coordinates), max(2, sample_limit))
 
     if target_samples <= 2:
         return [decoded_coordinates[0], decoded_coordinates[-1]]
@@ -219,7 +221,7 @@ def fetch_overpass_signals(sampled_points):
         OVERPASS_API_URL,
         data=query,
         headers={"Content-Type": "text/plain"},
-        timeout=12,
+        timeout=OVERPASS_TIMEOUT,
     )
     response.raise_for_status()
 
@@ -278,7 +280,7 @@ def fetch_traffic_snapshot(lat, lon):
             "unit": "KMPH",
             "thickness": 10,
         },
-        timeout=10,
+        timeout=EXTERNAL_API_TIMEOUT,
     )
     response.raise_for_status()
     return response.json().get("flowSegmentData", {})
@@ -286,40 +288,56 @@ def fetch_traffic_snapshot(lat, lon):
 
 def get_route_traffic_score(route, mode):
     if not get_traffic_api_key():
-        return 0, 0, 0
+        return None, 0, None
 
     sampled_points = get_route_sample_points(route)
 
     if not sampled_points:
-        return 0, 0, 0
+        return None, 0, None
 
     congestion_values = []
     road_closures = 0
 
-    for lat, lon in sampled_points:
+    def fetch_sample(point):
+        lat, lon = point
+
         try:
             traffic = fetch_traffic_snapshot(
                 round_coordinate(lat),
                 round_coordinate(lon),
             )
         except requests.RequestException:
-            continue
+            return None
 
         if not traffic:
-            continue
+            return None
 
         current_speed = traffic.get("currentSpeed")
         free_flow_speed = traffic.get("freeFlowSpeed")
-
-        if traffic.get("roadClosure"):
-            road_closures += 1
+        congestion_ratio = None
 
         if current_speed and free_flow_speed:
             congestion_ratio = 1 - min(current_speed / free_flow_speed, 1)
+
+        return congestion_ratio, bool(traffic.get("roadClosure"))
+
+    with ThreadPoolExecutor(max_workers=min(SCORING_WORKERS, len(sampled_points))) as executor:
+        traffic_samples = executor.map(fetch_sample, sampled_points)
+
+    for sample in traffic_samples:
+        if sample is None:
+            continue
+
+        congestion_ratio, road_closed = sample
+
+        if road_closed:
+            road_closures += 1
+
+        if congestion_ratio is not None:
             congestion_values.append(congestion_ratio)
 
     if not congestion_values and road_closures == 0:
-        return 0, 0, 0
+        return None, 0, None
 
     avg_congestion = round(sum(congestion_values) / len(congestion_values), 2) if congestion_values else 0
 
@@ -332,6 +350,11 @@ def get_route_traffic_score(route, mode):
 
 
 def score_route_for_traffic(route, mode):
+    existing_context = route.get("traffic_context")
+
+    if existing_context:
+        return route.get("traffic_score", existing_context.get("traffic_penalty", 0))
+
     traffic_congestion, road_closures, traffic_penalty = get_route_traffic_score(route, mode)
 
     route["traffic_score"] = traffic_penalty
@@ -360,7 +383,7 @@ def fetch_air_pollution_snapshot(lat, lon):
             "lon": lon,
             "appid": openweather_api_key,
         },
-        timeout=10,
+        timeout=EXTERNAL_API_TIMEOUT,
     )
     response.raise_for_status()
 
@@ -370,36 +393,42 @@ def fetch_air_pollution_snapshot(lat, lon):
 
 def get_route_pollution_score(route, mode):
     if not get_openweather_api_key():
-        return 0, 0, 0
+        return None, 0, None
 
     sampled_points = get_route_sample_points(route)
 
     if not sampled_points:
-        return 0, 0, 0
+        return None, 0, None
 
     air_quality_values = []
     polluted_samples = 0
 
-    for lat, lon in sampled_points:
+    def fetch_sample(point):
+        lat, lon = point
+
         try:
             pollution = fetch_air_pollution_snapshot(
                 round_coordinate(lat),
                 round_coordinate(lon),
             )
         except requests.RequestException:
-            continue
+            return None
 
         if not pollution:
-            continue
+            return None
 
-        aqi = pollution.get("main", {}).get("aqi")
+        return pollution.get("main", {}).get("aqi")
 
+    with ThreadPoolExecutor(max_workers=min(SCORING_WORKERS, len(sampled_points))) as executor:
+        pollution_samples = executor.map(fetch_sample, sampled_points)
+
+    for aqi in pollution_samples:
         if aqi:
             air_quality_values.append(aqi)
             polluted_samples += 1
 
     if not air_quality_values:
-        return 0, 0, 0
+        return None, 0, None
 
     avg_aqi = round(sum(air_quality_values) / len(air_quality_values), 2)
 
@@ -427,6 +456,19 @@ def score_route_for_pollution(route, mode):
     }
 
     return air_quality_index
+
+
+def score_routes_in_parallel(routes, score_function):
+    if not routes:
+        return
+
+    with ThreadPoolExecutor(max_workers=min(SCORING_WORKERS, len(routes))) as executor:
+        list(executor.map(score_function, routes))
+
+
+def get_sortable_score(route, score_name):
+    score = route.get(score_name)
+    return score if score is not None else float("inf")
 
 
 @api.route("/route/pollution", methods=["POST"])
@@ -496,13 +538,17 @@ def get_low_pollution_route():
     routes = route_data.get("routes", [])
 
     if routes:
+        score_routes_in_parallel(
+            routes,
+            lambda route: score_route_for_pollution(route, mode),
+        )
+
         for index, route in enumerate(routes):
-            score_route_for_pollution(route, mode)
             route["route_rank"] = index + 1
 
         routes.sort(
             key=lambda route: (
-                route.get("pollution_score", float("inf")),
+                get_sortable_score(route, "pollution_score"),
                 route.get("summary", {}).get("distance", float("inf")),
             )
         )
@@ -569,7 +615,7 @@ def fetch_openrouteservice_route(profile, ors_api_key, request_body):
             "Authorization": ors_api_key,
             "Content-Type": "application/json",
         },
-        timeout=20,
+        timeout=ORS_TIMEOUT,
     )
     response.raise_for_status()
     return response.json()
@@ -593,16 +639,22 @@ def score_route_for_safety(route, mode, current_hour):
     sampled_points = get_route_sample_points(route)
     normalized_points = normalize_sampled_points(sampled_points)
 
-    try:
-        overpass_poi_ids, overpass_street_light_ids = fetch_overpass_signals(normalized_points)
-    except requests.RequestException:
-        overpass_poi_ids, overpass_street_light_ids = tuple(), tuple()
+    def fetch_safety_signals():
+        try:
+            return fetch_overpass_signals(normalized_points)
+        except requests.RequestException:
+            return tuple(), tuple()
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        overpass_future = executor.submit(fetch_safety_signals)
+        traffic_future = executor.submit(get_route_traffic_score, route, mode)
+        overpass_poi_ids, overpass_street_light_ids = overpass_future.result()
+        traffic_congestion, road_closures, traffic_penalty = traffic_future.result()
 
     crowd_score, crowd_bonus = get_route_activity_score(overpass_poi_ids)
     street_light_count, main_road_ratio, lighting_bonus = get_route_lighting_score(
         overpass_street_light_ids, waytype_summary
     )
-    traffic_congestion, road_closures, traffic_penalty = get_route_traffic_score(route, mode)
     safety_score = round(
         max(
             1,
@@ -610,7 +662,7 @@ def score_route_for_safety(route, mode, current_hour):
                 6,
                 base_safety_score
                 + time_penalty
-                + traffic_penalty
+                + (traffic_penalty or 0)
                 - crowd_bonus
                 - lighting_bonus,
             ),
@@ -619,6 +671,14 @@ def score_route_for_safety(route, mode, current_hour):
     )
 
     route["safety_score"] = safety_score
+    route["traffic_score"] = traffic_penalty
+    route["traffic_context"] = {
+        "traffic_congestion": traffic_congestion,
+        "traffic_penalty": traffic_penalty,
+        "road_closures": road_closures,
+        "evaluated_hour": current_hour,
+        "mode": mode,
+    }
     route["safety_context"] = {
         "base_score": base_safety_score,
         "time_penalty": time_penalty,
@@ -648,8 +708,10 @@ def get_route():
     filters = data.get("filters") or {}
     is_safe = bool(filters.get("safest", False))
     avoid_traffic = bool(filters.get("traffic", False))
+    avoid_pollution = bool(filters.get("pollution", False))
     ors_api_key = get_env_value("ORS_API_KEY")
     can_score_traffic = bool(get_traffic_api_key())
+    can_score_pollution = bool(get_openweather_api_key())
 
     if not ors_api_key:
         return jsonify({"error": "ORS_API_KEY is missing or empty in backend/.env"}), 500
@@ -664,14 +726,22 @@ def get_route():
 
     request_body = build_route_request_body(
         coordinates,
-        include_alternatives=is_safe or (avoid_traffic and can_score_traffic),
+        include_alternatives=(
+            is_safe
+            or (avoid_traffic and can_score_traffic)
+            or (avoid_pollution and can_score_pollution)
+        ),
     )
 
     try:
         route_data = fetch_openrouteservice_route(profile, ors_api_key, request_body)
     except requests.RequestException as error:
         should_retry_without_alternatives = (
-            (is_safe or (avoid_traffic and can_score_traffic))
+            (
+                is_safe
+                or (avoid_traffic and can_score_traffic)
+                or (avoid_pollution and can_score_pollution)
+            )
             and error.response is not None
             and error.response.status_code == 400
         )
@@ -703,7 +773,7 @@ def get_route():
                     "Authorization": ors_api_key,
                     "Content-Type": "application/json",
                 },
-                timeout=20,
+                timeout=ORS_TIMEOUT,
             )
             response.raise_for_status()
             route_data = response.json()
@@ -716,6 +786,8 @@ def get_route():
                 route_data["metadata"]["safest_route_fallback"] = fallback_message
             if avoid_traffic:
                 route_data["metadata"]["traffic_route_fallback"] = fallback_message
+            if avoid_pollution:
+                route_data["metadata"]["low_pollution_route_fallback"] = fallback_message
         except requests.RequestException as retry_error:
             details = None
 
@@ -738,12 +810,24 @@ def get_route():
             "Showing the default route."
         )
 
+    if avoid_pollution and not can_score_pollution:
+        route_data.setdefault("metadata", {})
+        route_data["metadata"]["low_pollution_route_enabled"] = False
+        route_data["metadata"]["low_pollution_route_fallback"] = (
+            "OpenWeather API key is missing, so pollution scoring is unavailable. "
+            "Showing the default route."
+        )
+
     if is_safe:
         current_hour = datetime.now().hour
         routes = route_data.get("routes", [])
 
+        score_routes_in_parallel(
+            routes,
+            lambda route: score_route_for_safety(route, mode, current_hour),
+        )
+
         for index, route in enumerate(routes):
-            score_route_for_safety(route, mode, current_hour)
             route["route_rank"] = index + 1
 
         routes.sort(key=lambda route: route.get("safety_score", 6))
@@ -766,16 +850,48 @@ def get_route():
             "Lowest safety score returned first"
         )
 
+    if avoid_pollution and can_score_pollution:
+        routes = route_data.get("routes", [])
+
+        score_routes_in_parallel(
+            routes,
+            lambda route: score_route_for_pollution(route, mode),
+        )
+
+        routes.sort(
+            key=lambda route: (
+                get_sortable_score(route, "pollution_score"),
+                route.get("summary", {}).get("distance", float("inf")),
+            )
+        )
+
+        for index, route in enumerate(routes):
+            route["selected_for_pollution"] = index == 0
+            route["pollution_context"]["alternatives_considered"] = len(routes)
+            route["pollution_context"]["selected_rank"] = index + 1
+
+        route_data["routes"] = routes
+        route_data.setdefault("metadata", {})
+        route_data["metadata"]["low_pollution_route_enabled"] = True
+        route_data["metadata"]["alternatives_returned"] = len(routes)
+        route_data["metadata"]["selected_route_strategy"] = (
+            "Lowest air quality index returned first"
+        )
+
     if avoid_traffic and can_score_traffic:
         routes = route_data.get("routes", [])
 
+        score_routes_in_parallel(
+            routes,
+            lambda route: score_route_for_traffic(route, mode),
+        )
+
         for index, route in enumerate(routes):
-            score_route_for_traffic(route, mode)
             route["route_rank"] = index + 1
 
         routes.sort(
             key=lambda route: (
-                route.get("traffic_score", float("inf")),
+                get_sortable_score(route, "traffic_score"),
                 route.get("summary", {}).get("duration", float("inf")),
                 route.get("summary", {}).get("distance", float("inf")),
             )
@@ -797,6 +913,52 @@ def get_route():
         route_data["metadata"]["alternatives_returned"] = len(routes)
         route_data["metadata"]["selected_route_strategy"] = (
             "Lowest live-traffic penalty returned first"
+        )
+
+    if (
+        avoid_pollution
+        and can_score_pollution
+        and avoid_traffic
+        and can_score_traffic
+    ):
+        routes = route_data.get("routes", [])
+        pollution_order = sorted(
+            routes,
+            key=lambda route: get_sortable_score(route, "pollution_score"),
+        )
+        traffic_order = sorted(
+            routes,
+            key=lambda route: get_sortable_score(route, "traffic_score"),
+        )
+        pollution_ranks = {
+            id(route): rank for rank, route in enumerate(pollution_order, start=1)
+        }
+        traffic_ranks = {
+            id(route): rank for rank, route in enumerate(traffic_order, start=1)
+        }
+
+        for route in routes:
+            route["combined_environment_rank"] = (
+                pollution_ranks[id(route)] + traffic_ranks[id(route)]
+            )
+
+        routes.sort(
+            key=lambda route: (
+                route.get("combined_environment_rank", float("inf")),
+                get_sortable_score(route, "traffic_score"),
+                get_sortable_score(route, "pollution_score"),
+                route.get("summary", {}).get("duration", float("inf")),
+            )
+        )
+
+        for index, route in enumerate(routes):
+            route["selected_for_combined_environment"] = index == 0
+
+        route_data["routes"] = routes
+        route_data.setdefault("metadata", {})
+        route_data["metadata"]["combined_environment_route_enabled"] = True
+        route_data["metadata"]["selected_route_strategy"] = (
+            "Best combined pollution and live-traffic rank returned first"
         )
 
     return jsonify(route_data)
@@ -893,7 +1055,7 @@ def get_place_images():
                 "orientation": "landscape",
                 "client_id": UNSPLASH_API_KEY,
             },
-            timeout=20,
+            timeout=ORS_TIMEOUT,
         )
         response.raise_for_status()
         data = response.json()
@@ -936,8 +1098,7 @@ def get_place_details():
     if not query:
         return jsonify({"error": "Query required"}), 400
 
-    if not UNSPLASH_API_KEY:
-        return jsonify({"error": "UNSPLASH_API_KEY is not configured"}), 500
+    images = []
 
     try:
         clean_query = query.split(",")[0].strip()
@@ -990,24 +1151,30 @@ def get_place_details():
             )
 
         # 🔥 2. Unsplash Images
-        unsplash_res = requests.get(
-            "https://api.unsplash.com/search/photos",
-            params={
-                "query": f"{clean_query} city",
-                "per_page": 6,
-                "orientation": "landscape",
-                "client_id": UNSPLASH_API_KEY,
-            },
-            timeout=20,
-        )
+        images = []
+        if UNSPLASH_API_KEY:
+            try:
+                unsplash_res = requests.get(
+                    "https://api.unsplash.com/search/photos",
+                    params={
+                        "query": f"{clean_query} city",
+                        "per_page": 6,
+                        "orientation": "landscape",
+                        "client_id": UNSPLASH_API_KEY,
+                    },
+                    timeout=20,
+                )
 
-        unsplash_res.raise_for_status()
-        unsplash_data = unsplash_res.json()
+                unsplash_res.raise_for_status()
 
-        images = [
-            img["urls"]["regular"]
-            for img in unsplash_data.get("results", [])
-        ]
+                unsplash_data = unsplash_res.json()
+
+                images = [
+                    img["urls"]["regular"]
+                    for img in unsplash_data.get("results", [])
+                ]
+            except Exception as e:
+                print("Unsplash Error:", e)
 
         # 🔥 Add Wikipedia image at first (if exists)
         if wiki_image:
