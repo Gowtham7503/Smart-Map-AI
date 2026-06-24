@@ -12,12 +12,7 @@ import Chatbot from "../Chatbot/Chatbot";
 
 const defaultCenter = [17.4948, 78.3996];
 const LAST_SEARCH_STORAGE_KEY = "smartmap:last-search";
-const TRAVEL_MODES = ["car", "bike", "walk"];
-
-const getOrderedTravelModes = (preferredMode) => [
-  preferredMode,
-  ...TRAVEL_MODES.filter((travelMode) => travelMode !== preferredMode),
-];
+const directionsGeocodeCache = new Map();
 
 const formatBackendError = (details, seen = new WeakSet()) => {
   if (!details) {
@@ -77,9 +72,18 @@ const getRouteFailureMessage = (failure) => {
   return backendError || "Unable to fetch route details for any travel mode.";
 };
 
-const geocodePlaceWithNominatim = async (place) => {
+const geocodePlaceWithNominatim = async (place, includeGeometry = true) => {
   const res = await axios.get(
-    `https://nominatim.openstreetmap.org/search?format=json&polygon_geojson=1&q=${encodeURIComponent(place)}`,
+    "https://nominatim.openstreetmap.org/search",
+    {
+      params: {
+        format: "json",
+        polygon_geojson: includeGeometry ? 1 : 0,
+        limit: includeGeometry ? 10 : 5,
+        q: place,
+      },
+      timeout: 8000,
+    },
   );
 
   return res.data;
@@ -130,6 +134,12 @@ const parseRouteDetails = (routeResponse) => {
         ),
         trafficRouteFallback:
           routeResponse?.metadata?.traffic_route_fallback || null,
+        selectedForCombinedEnvironment: Boolean(
+          route.selected_for_combined_environment,
+        ),
+        combinedEnvironmentRouteEnabled: Boolean(
+          routeResponse?.metadata?.combined_environment_route_enabled,
+        ),
         selectedRouteStrategy:
           routeResponse?.metadata?.selected_route_strategy || null,
       },
@@ -161,6 +171,7 @@ const getSavedSearch = () => {
 const MapView = () => {
   const savedSearch = getSavedSearch();
   const isFirstSafetyEffect = useRef(true);
+  const routeRequestIdRef = useRef(0);
 
   const [showSidebar, setShowSidebar] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(320);
@@ -204,6 +215,7 @@ const MapView = () => {
   const [placeDetailsLoading, setPlaceDetailsLoading] = useState(false);
   const [placeDetailsError, setPlaceDetailsError] = useState("");
   const [showChatbot, setShowChatbot] = useState(false);
+  const [currentLocation, setCurrentLocation] = useState(null);
   const [filters, setFilters] = useState({
     safest: true,
     pollution: false,
@@ -237,7 +249,7 @@ const MapView = () => {
       );
     });
 
-  const getPlaceDetails = async (place) => {
+  const getPlaceDetails = async (place, includeGeometry = true) => {
     const trimmedPlace = place.trim();
 
     if (!trimmedPlace) {
@@ -255,7 +267,18 @@ const MapView = () => {
       };
     }
 
-    const results = await geocodePlaceWithNominatim(trimmedPlace);
+    const cacheKey = trimmedPlace.toLowerCase();
+    let results;
+
+    if (!includeGeometry && directionsGeocodeCache.has(cacheKey)) {
+      results = directionsGeocodeCache.get(cacheKey);
+    } else {
+      results = await geocodePlaceWithNominatim(trimmedPlace, includeGeometry);
+
+      if (!includeGeometry) {
+        directionsGeocodeCache.set(cacheKey, results);
+      }
+    }
 
     if (!results?.length) {
       throw new Error(`No results found for "${trimmedPlace}".`);
@@ -282,24 +305,32 @@ const MapView = () => {
   };
 
   const getCoordinates = async (place) => {
-    const details = await getPlaceDetails(place);
+    const details = await getPlaceDetails(place, false);
     return details.coordinates;
   };
 
   const getRouteRequest = (activeFilters) =>
     activeFilters.pollution && !activeFilters.traffic ? getLowPollutionRoute : getRoute;
 
-  const fetchRoute = async (preferredMode = mode) => {
+  const fetchRoute = async (
+    preferredMode = mode,
+    preserveExistingModes = false,
+  ) => {
+    let requestId = null;
+
     try {
       if (!from || !to) {
         alert("Please enter both locations");
         return;
       }
 
+      requestId = ++routeRequestIdRef.current;
       setRouteLoading(true);
 
-      const start = await getCoordinates(from);
-      const end = await getCoordinates(to);
+      const [start, end] = await Promise.all([
+        getCoordinates(from),
+        getCoordinates(to),
+      ]);
 
       setStartPosition(start);
       setEndPosition(end);
@@ -310,38 +341,23 @@ const MapView = () => {
         [end[1], end[0]],
       ];
       const requestRoute = getRouteRequest(filters);
-      const routeResponses = [];
-      const orderedTravelModes = getOrderedTravelModes(preferredMode);
-
-      for (const travelMode of orderedTravelModes) {
-        try {
+      const routeResponses = await Promise.allSettled(
+        [preferredMode].map(async (travelMode) => {
           const response = await requestRoute(coordinates, travelMode, filters);
 
-          routeResponses.push({
-            status: "fulfilled",
-            value: {
-              mode: travelMode,
-              ...parseRouteDetails(response.data),
-            },
-          });
-        } catch (reason) {
-          routeResponses.push({
-            status: "rejected",
-            reason,
-          });
-        }
-      }
+          return {
+            mode: travelMode,
+            ...parseRouteDetails(response.data),
+          };
+        }),
+      );
 
-      const nextRouteDataByMode = {
-        car: null,
-        bike: null,
-        walk: null,
-      };
-      const nextRouteSummaries = {
-        car: null,
-        bike: null,
-        walk: null,
-      };
+      const nextRouteDataByMode = preserveExistingModes
+        ? { ...routeDataByMode }
+        : { car: null, bike: null, walk: null };
+      const nextRouteSummaries = preserveExistingModes
+        ? { ...routeSummaries }
+        : { car: null, bike: null, walk: null };
 
       routeResponses.forEach((result) => {
         if (result.status !== "fulfilled") {
@@ -364,19 +380,30 @@ const MapView = () => {
         throw new Error(getRouteFailureMessage(firstFailure));
       }
 
+      if (requestId !== routeRequestIdRef.current) {
+        return;
+      }
+
       setRouteDataByMode(nextRouteDataByMode);
       setRouteSummaries(nextRouteSummaries);
       setRouteCoords(activeRoute);
     } catch (error) {
+      if (requestId !== routeRequestIdRef.current) {
+        return;
+      }
+
       console.error("Routing error:", error);
       alert(error.message || "Unable to fetch the route.");
       clearRoutePreview();
     } finally {
-      setRouteLoading(false);
+      if (requestId === routeRequestIdRef.current) {
+        setRouteLoading(false);
+      }
     }
   };
 
   const clearRoutePreview = () => {
+    routeRequestIdRef.current += 1;
     setRouteCoords([]);
     setRouteSummaries({
       car: null,
@@ -519,6 +546,11 @@ const MapView = () => {
 
     if (routeDataByMode[nextMode]) {
       setRouteCoords(routeDataByMode[nextMode]);
+      return;
+    }
+
+    if (from && to && routeCoords.length) {
+      fetchRoute(nextMode, true);
     }
   };
 
@@ -577,6 +609,40 @@ const MapView = () => {
     setPlaceDetailsLoading(false);
   };
 
+  const handleChatbotPlaceSelect = async (place) => {
+    const latitude = Number(place.latitude);
+    const longitude = Number(place.longitude);
+    const position =
+      Number.isFinite(latitude) && Number.isFinite(longitude)
+        ? [latitude, longitude]
+        : mapFocusPosition;
+
+    setSelectedPlacePosition(position);
+    setMapFocusPosition(position);
+    setHoveredPlace(null);
+    setPlaceDetailsError("");
+    setPlaceDetailsLoading(true);
+    setSelectedPlace({
+      name: place.name,
+      description: place.description || "Fetching place details...",
+      distance_km: place.distance_km,
+      images: [],
+    });
+
+    try {
+      const data = await fetchPlaceDetails(place.name);
+      setSelectedPlace({
+        ...data,
+        distance_km: place.distance_km ?? data.distance_km,
+      });
+    } catch (err) {
+      console.error(err);
+      setPlaceDetailsError(err.message || "Unable to fetch place details.");
+    } finally {
+      setPlaceDetailsLoading(false);
+    }
+  };
+
   useEffect(() => {
     const fetchUserData = async () => {
       try {
@@ -591,6 +657,22 @@ const MapView = () => {
   }, []);
 
   useEffect(() => {
+    if(!navigator.geolocation) return;
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setCurrentLocation([
+          position.coords.latitude,
+          position.coords.longitude,
+        ]);
+      },
+      (error) => {
+        console.error("Location error:", error);
+      }
+    );
+  }, []);
+
+  useEffect(() => {
     if (isFirstSafetyEffect.current) {
       isFirstSafetyEffect.current = false;
       return;
@@ -600,7 +682,12 @@ const MapView = () => {
       return;
     }
 
-    fetchRoute(mode);
+    routeRequestIdRef.current += 1;
+    const filterRefreshTimer = window.setTimeout(() => {
+      fetchRoute(mode);
+    }, 150);
+
+    return () => window.clearTimeout(filterRefreshTimer);
     // Re-run only when route preference filters change; route inputs are read from current state.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters.safest, filters.pollution, filters.traffic]);
@@ -665,7 +752,14 @@ const MapView = () => {
           startPosition={startPosition}
         />
 
-        {showChatbot && <Chatbot onClose={() => setShowChatbot(false)} />}
+        {showChatbot && (
+          <Chatbot
+            locationLabel="My Current Location"
+            mapPosition={currentLocation || mapFocusPosition}
+            onClose={() => setShowChatbot(false)}
+            onPlaceSelect={handleChatbotPlaceSelect}
+          />
+        )}
 
         {hoveredPlace && !selectedPlace && (
           <PlaceHoverCard

@@ -88,6 +88,11 @@ const PlaceHoverCard = ({
         {detailMode ? (
           <>
             <p>{loading ? "Loading..." : description}</p>
+            {place?.distance_km && (
+              <p>
+                <strong>Distance:</strong> {place.distance_km} km
+              </p>
+            )}
 
             {error && <p className="detail-card-error">{error}</p>}
 
@@ -98,7 +103,7 @@ const PlaceHoverCard = ({
                 target="_blank"
                 rel="noreferrer"
               >
-                Read more on wikipedia
+                Read more on Wikipedia
               </a>
             )}
 

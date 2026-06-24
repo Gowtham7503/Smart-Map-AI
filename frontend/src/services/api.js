@@ -13,6 +13,19 @@ export const getLowPollutionRoute = (coordinates, mode = "car", filters = {}) =>
   return API.post("/route/pollution", { coordinates, mode, filters });
 };
 
+export const getChatbotRecommendations = (
+  message,
+  position,
+  locationLabel,
+) => {
+  return API.post("/chatbot/recommendations", {
+    message,
+    latitude: position?.[0] ?? null,
+    longitude: position?.[1] ?? null,
+    location_label: locationLabel,
+  });
+};
+
 export const getShortestRoute = (coordinates, mode = "car") => {
   return API.post("/route/shortest", { coordinates, mode });
 };
