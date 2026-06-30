@@ -224,27 +224,55 @@ const getPollutionScoreMessage = (summary) => {
 
 const MapBottomPanel = ({
   filters,
+  isCollapsed,
   mode,
+  navigationActive,
   onModeChange,
   onResizeStart,
+  onStartNavigation,
+  onToggleCollapse,
   panelHeight,
   place,
   routeLoading,
+  routeOption = "preferred",
   routeSummaries,
+  secondaryRouteSummaries,
   showSidebar,
 }) => {
-  if (!showSidebar || place) {
+  if (!showSidebar || place || navigationActive) {
     return null;
   }
 
-  const activeSummary = routeSummaries[mode] || null;
+  const visibleRouteSummaries =
+    routeOption === "secondary" ? secondaryRouteSummaries : routeSummaries;
+  const activeSummary = visibleRouteSummaries[mode] || null;
+  const activeRouteLabel =
+    routeOption === "secondary" ? "Second option" : "Preferred route";
 
   return (
     <div
-      className="bottom-panel"
+      className={`bottom-panel ${isCollapsed ? "collapsed" : ""}`}
       style={{ height: panelHeight }}
     >
-      <div className="panel-resize-handle" onMouseDown={onResizeStart} />
+      <div className="panel-resize-handle" onMouseDown={onResizeStart}>
+        <button
+          className="panel-collapse-btn"
+          onClick={onToggleCollapse}
+          onMouseDown={(event) => event.stopPropagation()}
+          type="button"
+          aria-label={isCollapsed ? "Expand bottom panel" : "Collapse bottom panel"}
+        >
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none">
+            <path
+              d="M6 9l6 6 6-6"
+              stroke="currentColor"
+              strokeWidth="2.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
+      </div>
       <div className="bottom-panel-content">
         <div className="vehicle-panel">
           <div
@@ -272,7 +300,7 @@ const MapBottomPanel = ({
             </svg>
             <div className="vehicle-btn-copy">
               <span>Car</span>
-              <small>{formatDuration(routeSummaries.car?.durationMinutes)}</small>
+              <small>{formatDuration(visibleRouteSummaries.car?.durationMinutes)}</small>
             </div>
           </div>
 
@@ -331,7 +359,7 @@ const MapBottomPanel = ({
             </svg>
             <div className="vehicle-btn-copy">
               <span>Bike</span>
-              <small>{formatDuration(routeSummaries.bike?.durationMinutes)}</small>
+              <small>{formatDuration(visibleRouteSummaries.bike?.durationMinutes)}</small>
             </div>
           </div>
 
@@ -380,12 +408,17 @@ const MapBottomPanel = ({
             </svg>
             <div className="vehicle-btn-copy">
               <span>Walk</span>
-              <small>{formatDuration(routeSummaries.walk?.durationMinutes)}</small>
+              <small>{formatDuration(visibleRouteSummaries.walk?.durationMinutes)}</small>
             </div>
           </div>
         </div>
 
         <div className="route-summary-card">
+          <div className="route-summary-item">
+            <p className="route-summary-label">Route</p>
+            <strong>{activeRouteLabel}</strong>
+          </div>
+
           <div className="route-summary-item">
             <p className="route-summary-label">Estimated time</p>
             <strong>{routeLoading ? "Calculating..." : formatDuration(activeSummary?.durationMinutes)}</strong>
@@ -441,6 +474,15 @@ const MapBottomPanel = ({
             </div>
           )}
         </div>
+
+        <button
+          className="get-started-navigation-btn"
+          disabled={routeLoading || !activeSummary}
+          onClick={onStartNavigation}
+          type="button"
+        >
+          {navigationActive ? "Navigation started" : "Get started"}
+        </button>
       </div>
     </div>
   );
