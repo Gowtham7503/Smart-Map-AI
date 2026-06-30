@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import {
   GeoJSON,
   MapContainer,
@@ -141,12 +141,31 @@ const MapControls = ({
   );
 };
 
-const MapViewportController = ({ focusBounds, focusPosition, routeCoords }) => {
+const MapViewportController = ({
+  focusBounds,
+  focusPosition,
+  navigationActive,
+  navigationPosition,
+  routeCoords,
+  secondaryRouteCoords,
+}) => {
   const map = useMap();
 
   useEffect(() => {
+    if (navigationActive && navigationPosition) {
+      map.flyTo(navigationPosition, 18, {
+        duration: 0.7,
+      });
+      return;
+    }
+
     if (routeCoords.length > 0) {
-      map.flyToBounds(routeCoords, {
+      const routeBounds =
+        secondaryRouteCoords.length > 0
+          ? [...routeCoords, ...secondaryRouteCoords]
+          : routeCoords;
+
+      map.flyToBounds(routeBounds, {
         padding: [60, 60],
         duration: 1,
       });
@@ -166,9 +185,29 @@ const MapViewportController = ({ focusBounds, focusPosition, routeCoords }) => {
         duration: 1,
       });
     }
-  }, [focusBounds, focusPosition, map, routeCoords]);
+  }, [
+    focusBounds,
+    focusPosition,
+    map,
+    navigationActive,
+    navigationPosition,
+    routeCoords,
+    secondaryRouteCoords,
+  ]);
 
   return null;
+};
+
+const getNavigationLabel = (mode) => {
+  if (mode === "bike") {
+    return "Bike";
+  }
+
+  if (mode === "walk") {
+    return "Walking";
+  }
+
+  return "Vehicle";
 };
 
 const MapCanvas = ({
@@ -176,10 +215,18 @@ const MapCanvas = ({
   handlePlaceClick,
   hasSelectedPlace,
   mapFocusPosition,
+  navigationActive,
+  navigationHeading = 0,
+  navigationMode,
+  navigationPosition,
   onCloseSelectedPlace,
+  onExitNavigation,
   onOpenChatbot,
+  onRouteOptionSelect,
   panelHeight,
   routeCoords,
+  selectedRouteOption = "preferred",
+  secondaryRouteCoords = [],
   searchBounds,
   searchLabel,
   searchOutline,
@@ -190,6 +237,21 @@ const MapCanvas = ({
   startLabel,
   endLabel,
 }) => {
+  const navigationIcon = useMemo(
+    () =>
+      L.divIcon({
+        className: "navigation-vehicle-icon",
+        html: `
+          <div class="navigation-vehicle-marker ${navigationMode || "car"}" style="--vehicle-heading: ${navigationHeading}deg">
+            <span class="navigation-vehicle-arrow"></span>
+          </div>
+        `,
+        iconSize: [44, 44],
+        iconAnchor: [22, 22],
+      }),
+    [navigationHeading, navigationMode],
+  );
+
   const renderInteractiveMarker = (place, popupLabel) => (
     <Marker
       position={place.position}
@@ -208,7 +270,7 @@ const MapCanvas = ({
       center={mapFocusPosition}
       zoom={12}
       zoomControl={false}
-      className="leaflet-map"
+      className={`leaflet-map ${navigationActive ? "navigation-map-3d" : ""}`}
     >
       <EnableZoom />
       <MapControls
@@ -219,7 +281,10 @@ const MapCanvas = ({
       />
       <MapViewportController
         focusPosition={mapFocusPosition}
+        navigationActive={navigationActive}
+        navigationPosition={navigationPosition}
         routeCoords={routeCoords}
+        secondaryRouteCoords={secondaryRouteCoords}
         focusBounds={searchBounds}
       />
 
@@ -284,16 +349,98 @@ const MapCanvas = ({
         />
       )}
 
+      {secondaryRouteCoords.length > 0 && (
+        <Polyline
+          key={`secondary-${JSON.stringify(secondaryRouteCoords)}`}
+          positions={secondaryRouteCoords}
+          pathOptions={{
+            color: "#16a34a",
+            weight: selectedRouteOption === "secondary" ? 7 : 5,
+            opacity: selectedRouteOption === "secondary" ? 1 : 0.8,
+            dashArray: "1 12",
+            lineCap: "round",
+          }}
+        >
+          <Popup>Second preference route</Popup>
+        </Polyline>
+      )}
+
       {routeCoords.length > 0 && (
         <Polyline
           key={JSON.stringify(routeCoords)}
           positions={routeCoords}
           pathOptions={{
             color: "#2ecc71",
-            weight: 6,
-            opacity: 1,
+            weight: selectedRouteOption === "preferred" ? 7 : 5,
+            opacity: selectedRouteOption === "preferred" ? 1 : 0.65,
+          }}
+        >
+          <Popup>Preferred route</Popup>
+        </Polyline>
+      )}
+
+      {routeCoords.length > 0 && (
+        <Polyline
+          key={`preferred-hit-${JSON.stringify(routeCoords)}`}
+          eventHandlers={{
+            click: () => onRouteOptionSelect?.("preferred"),
+          }}
+          positions={routeCoords}
+          pathOptions={{
+            color: "#000000",
+            weight: 18,
+            opacity: 0.01,
           }}
         />
+      )}
+
+      {secondaryRouteCoords.length > 0 && (
+        <Polyline
+          key={`secondary-hit-${JSON.stringify(secondaryRouteCoords)}`}
+          eventHandlers={{
+            click: () => onRouteOptionSelect?.("secondary"),
+          }}
+          positions={secondaryRouteCoords}
+          pathOptions={{
+            color: "#000000",
+            weight: 22,
+            opacity: 0.01,
+          }}
+        />
+      )}
+
+      {navigationActive && navigationPosition && (
+        <Marker
+          position={navigationPosition}
+          icon={navigationIcon}
+          interactive={false}
+          zIndexOffset={1200}
+        >
+          <Popup>{getNavigationLabel(navigationMode)} pointer</Popup>
+        </Marker>
+      )}
+
+      {navigationActive && (
+        <button
+          className="exit-navigation-btn"
+          onClick={onExitNavigation}
+          type="button"
+        >
+          Exit navigation
+        </button>
+      )}
+
+      {routeCoords.length > 0 && secondaryRouteCoords.length > 0 && (
+        <div className="route-map-legend" aria-label="Route options">
+          <span>
+            <i className="route-map-legend-line preferred" />
+            Preferred
+          </span>
+          <span>
+            <i className="route-map-legend-line secondary" />
+            Second option
+          </span>
+        </div>
       )}
     </MapContainer>
   );

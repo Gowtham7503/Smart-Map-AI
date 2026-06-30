@@ -493,15 +493,14 @@ def get_low_pollution_route():
     can_score_pollution = bool(openweather_api_key)
     request_body = build_route_request_body(
         coordinates,
-        include_alternatives=can_score_pollution,
+        include_alternatives=True,
     )
 
     try:
         route_data = fetch_openrouteservice_route(profile, ors_api_key, request_body)
     except requests.RequestException as error:
         should_retry_without_alternatives = (
-            can_score_pollution
-            and error.response is not None
+            error.response is not None
             and error.response.status_code == 400
         )
 
@@ -529,6 +528,9 @@ def get_low_pollution_route():
     if not can_score_pollution:
         route_data.setdefault("metadata", {})
         route_data["metadata"]["low_pollution_route_enabled"] = False
+        route_data["metadata"]["alternatives_returned"] = len(
+            route_data.get("routes", []),
+        )
         route_data["metadata"]["low_pollution_route_fallback"] = (
             "OpenWeather API key is missing, so pollution scoring is unavailable. "
             "Showing the default route."
@@ -726,23 +728,14 @@ def get_route():
 
     request_body = build_route_request_body(
         coordinates,
-        include_alternatives=(
-            is_safe
-            or (avoid_traffic and can_score_traffic)
-            or (avoid_pollution and can_score_pollution)
-        ),
+        include_alternatives=True,
     )
 
     try:
         route_data = fetch_openrouteservice_route(profile, ors_api_key, request_body)
     except requests.RequestException as error:
         should_retry_without_alternatives = (
-            (
-                is_safe
-                or (avoid_traffic and can_score_traffic)
-                or (avoid_pollution and can_score_pollution)
-            )
-            and error.response is not None
+            error.response is not None
             and error.response.status_code == 400
         )
 
@@ -960,6 +953,11 @@ def get_route():
         route_data["metadata"]["selected_route_strategy"] = (
             "Best combined pollution and live-traffic rank returned first"
         )
+
+    route_data.setdefault("metadata", {})
+    route_data["metadata"]["alternatives_returned"] = len(
+        route_data.get("routes", []),
+    )
 
     return jsonify(route_data)
 

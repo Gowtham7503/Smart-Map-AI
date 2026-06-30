@@ -89,61 +89,75 @@ const geocodePlaceWithNominatim = async (place, includeGeometry = true) => {
   return res.data;
 };
 
+const decodeRouteCoords = (route) => {
+  if (!route?.geometry) {
+    return [];
+  }
+
+  return polyline.decode(route.geometry).map(([lat, lng]) => [lat, lng]);
+};
+
+const buildRouteSummary = (route, routeResponse) => ({
+  distanceKm: (route.summary?.distance || 0) / 1000,
+  durationMinutes: (route.summary?.duration || 0) / 60,
+  safetyScore:
+    route.safety_score == null ? null : Number(route.safety_score),
+  safetyContext: route.safety_context || null,
+  pollutionScore:
+    route.pollution_score == null ? null : Number(route.pollution_score),
+  pollutionContext: route.pollution_context || null,
+  trafficScore:
+    route.traffic_score == null ? null : Number(route.traffic_score),
+  trafficContext: route.traffic_context || null,
+  routeSelection: {
+    selectedForSafety: Boolean(route.selected_for_safety),
+    selectionReason: route.selection_reason || null,
+    alternativesReturned:
+      routeResponse?.metadata?.alternatives_returned ?? null,
+    safestRouteEnabled: Boolean(
+      routeResponse?.metadata?.safest_route_enabled,
+    ),
+    safestRouteFallback:
+      routeResponse?.metadata?.safest_route_fallback || null,
+    selectedForPollution: Boolean(route.selected_for_pollution),
+    lowPollutionRouteEnabled: Boolean(
+      routeResponse?.metadata?.low_pollution_route_enabled,
+    ),
+    lowPollutionRouteFallback:
+      routeResponse?.metadata?.low_pollution_route_fallback || null,
+    selectedForTraffic: Boolean(route.selected_for_traffic),
+    trafficRouteEnabled: Boolean(
+      routeResponse?.metadata?.traffic_route_enabled,
+    ),
+    trafficRouteFallback:
+      routeResponse?.metadata?.traffic_route_fallback || null,
+    selectedForCombinedEnvironment: Boolean(
+      route.selected_for_combined_environment,
+    ),
+    combinedEnvironmentRouteEnabled: Boolean(
+      routeResponse?.metadata?.combined_environment_route_enabled,
+    ),
+    selectedRouteStrategy:
+      routeResponse?.metadata?.selected_route_strategy || null,
+  },
+});
+
 const parseRouteDetails = (routeResponse) => {
-  const route = routeResponse?.routes?.[0];
+  const routes = routeResponse?.routes || [];
+  const route = routes[0];
+  const secondaryRoute = routes[1];
 
   if (!route?.geometry) {
     throw new Error("Route data is unavailable for this travel mode.");
   }
 
-  const decoded = polyline.decode(route.geometry);
-
   return {
-    coords: decoded.map(([lat, lng]) => [lat, lng]),
-    summary: {
-      distanceKm: (route.summary?.distance || 0) / 1000,
-      durationMinutes: (route.summary?.duration || 0) / 60,
-      safetyScore:
-        route.safety_score == null ? null : Number(route.safety_score),
-      safetyContext: route.safety_context || null,
-      pollutionScore:
-        route.pollution_score == null ? null : Number(route.pollution_score),
-      pollutionContext: route.pollution_context || null,
-      trafficScore:
-        route.traffic_score == null ? null : Number(route.traffic_score),
-      trafficContext: route.traffic_context || null,
-      routeSelection: {
-        selectedForSafety: Boolean(route.selected_for_safety),
-        selectionReason: route.selection_reason || null,
-        alternativesReturned:
-          routeResponse?.metadata?.alternatives_returned ?? null,
-        safestRouteEnabled: Boolean(
-          routeResponse?.metadata?.safest_route_enabled,
-        ),
-        safestRouteFallback:
-          routeResponse?.metadata?.safest_route_fallback || null,
-        selectedForPollution: Boolean(route.selected_for_pollution),
-        lowPollutionRouteEnabled: Boolean(
-          routeResponse?.metadata?.low_pollution_route_enabled,
-        ),
-        lowPollutionRouteFallback:
-          routeResponse?.metadata?.low_pollution_route_fallback || null,
-        selectedForTraffic: Boolean(route.selected_for_traffic),
-        trafficRouteEnabled: Boolean(
-          routeResponse?.metadata?.traffic_route_enabled,
-        ),
-        trafficRouteFallback:
-          routeResponse?.metadata?.traffic_route_fallback || null,
-        selectedForCombinedEnvironment: Boolean(
-          route.selected_for_combined_environment,
-        ),
-        combinedEnvironmentRouteEnabled: Boolean(
-          routeResponse?.metadata?.combined_environment_route_enabled,
-        ),
-        selectedRouteStrategy:
-          routeResponse?.metadata?.selected_route_strategy || null,
-      },
-    },
+    coords: decodeRouteCoords(route),
+    secondaryCoords: decodeRouteCoords(secondaryRoute),
+    summary: buildRouteSummary(route, routeResponse),
+    secondarySummary: secondaryRoute
+      ? buildRouteSummary(secondaryRoute, routeResponse)
+      : null,
   };
 };
 
@@ -157,7 +171,7 @@ const getSavedSearch = () => {
 
     const parsedSearch = JSON.parse(savedSearch);
 
-    if (!Array.isArray(parsedSearch.coordinates)) {
+    if (!Array.isArray(parsedSearch.coordinates) && !parsedSearch.label) {
       return null;
     }
 
@@ -172,15 +186,26 @@ const MapView = () => {
   const savedSearch = getSavedSearch();
   const isFirstSafetyEffect = useRef(true);
   const routeRequestIdRef = useRef(0);
+  const previousNavigationPositionRef = useRef(null);
 
   const [showSidebar, setShowSidebar] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(320);
   const [panelHeight, setPanelHeight] = useState(200);
+  const [isBottomPanelCollapsed, setIsBottomPanelCollapsed] = useState(false);
   const [dragSidebar, setDragSidebar] = useState(false);
   const [dragPanel, setDragPanel] = useState(false);
   const [routeCoords, setRouteCoords] = useState([]);
+  const [secondaryRouteCoords, setSecondaryRouteCoords] = useState([]);
+  const [navigationActive, setNavigationActive] = useState(false);
+  const [navigationPosition, setNavigationPosition] = useState(null);
+  const [navigationHeading, setNavigationHeading] = useState(0);
   const [user, setUser] = useState(null);
   const [routeSummaries, setRouteSummaries] = useState({
+    car: null,
+    bike: null,
+    walk: null,
+  });
+  const [secondaryRouteSummaries, setSecondaryRouteSummaries] = useState({
     car: null,
     bike: null,
     walk: null,
@@ -190,19 +215,27 @@ const MapView = () => {
     bike: null,
     walk: null,
   });
+  const [secondaryRouteDataByMode, setSecondaryRouteDataByMode] = useState({
+    car: null,
+    bike: null,
+    walk: null,
+  });
   const [routeLoading, setRouteLoading] = useState(false);
+  const [selectedRouteOption, setSelectedRouteOption] = useState("preferred");
   const [mode, setMode] = useState("car");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [searchQuery, setSearchQuery] = useState(savedSearch?.label || "");
   const [searchPosition, setSearchPosition] = useState(
-    savedSearch?.coordinates || null,
+    Array.isArray(savedSearch?.coordinates) ? savedSearch.coordinates : null,
   );
   const [searchLabel, setSearchLabel] = useState(savedSearch?.label || "");
   const [searchLoading, setSearchLoading] = useState(false);
-  const [searchBounds, setSearchBounds] = useState(savedSearch?.bounds || null);
+  const [searchBounds, setSearchBounds] = useState(
+    Array.isArray(savedSearch?.coordinates) ? savedSearch?.bounds || null : null,
+  );
   const [searchOutline, setSearchOutline] = useState(
-    savedSearch?.geojson || null,
+    Array.isArray(savedSearch?.coordinates) ? savedSearch?.geojson || null : null,
   );
   const [startPosition, setStartPosition] = useState(null);
   const [endPosition, setEndPosition] = useState(null);
@@ -312,6 +345,29 @@ const MapView = () => {
   const getRouteRequest = (activeFilters) =>
     activeFilters.pollution && !activeFilters.traffic ? getLowPollutionRoute : getRoute;
 
+  const getHeadingBetweenPositions = (fromPosition, toPosition) => {
+    if (!fromPosition || !toPosition) {
+      return 0;
+    }
+
+    const [fromLat, fromLng] = fromPosition.map((value) => value * Math.PI / 180);
+    const [toLat, toLng] = toPosition.map((value) => value * Math.PI / 180);
+    const deltaLng = toLng - fromLng;
+    const y = Math.sin(deltaLng) * Math.cos(toLat);
+    const x =
+      Math.cos(fromLat) * Math.sin(toLat) -
+      Math.sin(fromLat) * Math.cos(toLat) * Math.cos(deltaLng);
+
+    return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+  };
+
+  const stopNavigation = () => {
+    setNavigationActive(false);
+    setNavigationPosition(null);
+    setNavigationHeading(0);
+    previousNavigationPositionRef.current = null;
+  };
+
   const fetchRoute = async (
     preferredMode = mode,
     preserveExistingModes = false,
@@ -325,6 +381,7 @@ const MapView = () => {
       }
 
       requestId = ++routeRequestIdRef.current;
+      stopNavigation();
       setRouteLoading(true);
 
       const [start, end] = await Promise.all([
@@ -355,8 +412,14 @@ const MapView = () => {
       const nextRouteDataByMode = preserveExistingModes
         ? { ...routeDataByMode }
         : { car: null, bike: null, walk: null };
+      const nextSecondaryRouteDataByMode = preserveExistingModes
+        ? { ...secondaryRouteDataByMode }
+        : { car: null, bike: null, walk: null };
       const nextRouteSummaries = preserveExistingModes
         ? { ...routeSummaries }
+        : { car: null, bike: null, walk: null };
+      const nextSecondaryRouteSummaries = preserveExistingModes
+        ? { ...secondaryRouteSummaries }
         : { car: null, bike: null, walk: null };
 
       routeResponses.forEach((result) => {
@@ -365,7 +428,11 @@ const MapView = () => {
         }
 
         nextRouteDataByMode[result.value.mode] = result.value.coords;
+        nextSecondaryRouteDataByMode[result.value.mode] =
+          result.value.secondaryCoords;
         nextRouteSummaries[result.value.mode] = result.value.summary;
+        nextSecondaryRouteSummaries[result.value.mode] =
+          result.value.secondarySummary;
       });
 
       const activeRoute =
@@ -385,8 +452,14 @@ const MapView = () => {
       }
 
       setRouteDataByMode(nextRouteDataByMode);
+      setSecondaryRouteDataByMode(nextSecondaryRouteDataByMode);
       setRouteSummaries(nextRouteSummaries);
+      setSecondaryRouteSummaries(nextSecondaryRouteSummaries);
       setRouteCoords(activeRoute);
+      setSecondaryRouteCoords(
+        nextSecondaryRouteDataByMode[preferredMode] || [],
+      );
+      setSelectedRouteOption("preferred");
     } catch (error) {
       if (requestId !== routeRequestIdRef.current) {
         return;
@@ -405,7 +478,14 @@ const MapView = () => {
   const clearRoutePreview = () => {
     routeRequestIdRef.current += 1;
     setRouteCoords([]);
+    setSecondaryRouteCoords([]);
+    stopNavigation();
     setRouteSummaries({
+      car: null,
+      bike: null,
+      walk: null,
+    });
+    setSecondaryRouteSummaries({
       car: null,
       bike: null,
       walk: null,
@@ -415,9 +495,31 @@ const MapView = () => {
       bike: null,
       walk: null,
     });
+    setSecondaryRouteDataByMode({
+      car: null,
+      bike: null,
+      walk: null,
+    });
     setRouteLoading(false);
+    setSelectedRouteOption("preferred");
     setStartPosition(null);
     setEndPosition(null);
+  };
+
+  const clearDashboardMapState = () => {
+    clearRoutePreview();
+    setSearchQuery("");
+    setSearchPosition(null);
+    setSearchLabel("");
+    setSearchBounds(null);
+    setSearchOutline(null);
+    setHoveredPlace(null);
+    setSelectedPlace(null);
+    setSelectedPlacePosition(null);
+    setPlaceDetailsError("");
+    setPlaceDetailsLoading(false);
+    setMapFocusPosition(defaultCenter);
+    localStorage.removeItem(LAST_SEARCH_STORAGE_KEY);
   };
 
   const runSearch = async (query) => {
@@ -525,6 +627,7 @@ const MapView = () => {
     if (dragPanel) {
       const height = window.innerHeight - e.clientY;
       if (height > 120 && height < 400) {
+        setIsBottomPanelCollapsed(false);
         setPanelHeight(height);
       }
     }
@@ -542,10 +645,17 @@ const MapView = () => {
   };
 
   const handleModeChange = (nextMode) => {
+    stopNavigation();
     setMode(nextMode);
 
     if (routeDataByMode[nextMode]) {
       setRouteCoords(routeDataByMode[nextMode]);
+      setSecondaryRouteCoords(secondaryRouteDataByMode[nextMode] || []);
+      setSelectedRouteOption(
+        selectedRouteOption === "secondary" && secondaryRouteDataByMode[nextMode]?.length
+          ? "secondary"
+          : "preferred",
+      );
       return;
     }
 
@@ -562,11 +672,43 @@ const MapView = () => {
   };
 
   const handleClearFilters = () => {
+    stopNavigation();
+    setSelectedRouteOption("preferred");
     setFilters({
       safest: false,
       pollution: false,
       traffic: false,
     });
+  };
+
+  const handleRouteOptionSelect = (routeOption) => {
+    setSelectedRouteOption(routeOption);
+    setShowSidebar(true);
+    setIsBottomPanelCollapsed(false);
+    setSelectedPlace(null);
+    setSelectedPlacePosition(null);
+  };
+
+  const handleStartNavigation = () => {
+    const activeRouteCoords =
+      selectedRouteOption === "secondary" && secondaryRouteCoords.length
+        ? secondaryRouteCoords
+        : routeCoords;
+
+    if (!activeRouteCoords.length) {
+      alert("Find directions first, then start navigation.");
+      return;
+    }
+
+    const initialPosition = currentLocation || startPosition || activeRouteCoords[0];
+
+    previousNavigationPositionRef.current = initialPosition;
+    setNavigationPosition(initialPosition);
+    setMapFocusPosition(initialPosition);
+    setNavigationActive(true);
+    setShowSidebar(false);
+    setSelectedPlace(null);
+    setSelectedPlacePosition(null);
   };
 
   const fetchPlaceDetails = async (place) => {
@@ -673,6 +815,43 @@ const MapView = () => {
   }, []);
 
   useEffect(() => {
+    if (!navigationActive || !navigator.geolocation) {
+      return undefined;
+    }
+
+    const watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        const nextPosition = [
+          position.coords.latitude,
+          position.coords.longitude,
+        ];
+        const previousPosition = previousNavigationPositionRef.current;
+
+        if (previousPosition) {
+          setNavigationHeading(
+            getHeadingBetweenPositions(previousPosition, nextPosition),
+          );
+        }
+
+        previousNavigationPositionRef.current = nextPosition;
+        setCurrentLocation(nextPosition);
+        setNavigationPosition(nextPosition);
+        setMapFocusPosition(nextPosition);
+      },
+      (error) => {
+        console.error("Navigation location error:", error);
+      },
+      {
+        enableHighAccuracy: true,
+        maximumAge: 1000,
+        timeout: 10000,
+      },
+    );
+
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, [navigationActive]);
+
+  useEffect(() => {
     if (isFirstSafetyEffect.current) {
       isFirstSafetyEffect.current = false;
       return;
@@ -707,13 +886,13 @@ const MapView = () => {
         onSwapLocations={handleSwapLocations}
         setFrom={setFrom}
         setTo={setTo}
-        showSidebar={showSidebar}
+        showSidebar={showSidebar && !navigationActive}
         sidebarWidth={sidebarWidth}
         to={to}
         user={user}
       />
 
-      {showSidebar && (
+      {showSidebar && !navigationActive && (
         <div
           className="resize-handle"
           onMouseDown={() => setDragSidebar(true)}
@@ -722,14 +901,23 @@ const MapView = () => {
 
       <div className="map-area">
         <MapSearchBar
-          onDirectionsClick={handleDirectionsFromSearch}
-          onMenuClick={() => setShowSidebar(!showSidebar)}
+          onDirectionsClick={() => {
+            if (!navigationActive) {
+              handleDirectionsFromSearch();
+            }
+          }}
+          onMenuClick={() => {
+            if (!navigationActive) {
+              clearDashboardMapState();
+              setShowSidebar(!showSidebar);
+            }
+          }}
           onSearch={handleSearch}
           onSearchChange={setSearchQuery}
           onVoiceSearch={handleVoiceSearch}
           searchLoading={searchLoading}
           searchQuery={searchQuery}
-          showSidebar={showSidebar}
+          showSidebar={showSidebar && !navigationActive}
         />
 
         <MapCanvas
@@ -739,15 +927,23 @@ const MapView = () => {
           hasSelectedPlace={Boolean(selectedPlace)}
           mapFocusPosition={mapFocusPosition}
           onCloseSelectedPlace={handleCloseSelectedPlace}
+          onExitNavigation={stopNavigation}
           onOpenChatbot={() => setShowChatbot(true)}
-          panelHeight={panelHeight}
+          onRouteOptionSelect={handleRouteOptionSelect}
+          navigationActive={navigationActive}
+          navigationHeading={navigationHeading}
+          navigationMode={mode}
+          navigationPosition={navigationPosition}
+          panelHeight={isBottomPanelCollapsed ? 0 : panelHeight}
           routeCoords={routeCoords}
+          selectedRouteOption={selectedRouteOption}
+          secondaryRouteCoords={secondaryRouteCoords}
           searchBounds={searchBounds}
           searchLabel={searchLabel}
           searchOutline={searchOutline}
           searchPosition={searchPosition}
           setHoveredPlace={setHoveredPlace}
-          showSidebar={showSidebar}
+          showSidebar={showSidebar && !navigationActive}
           startLabel={from}
           startPosition={startPosition}
         />
@@ -780,14 +976,23 @@ const MapView = () => {
 
         <MapBottomPanel
           filters={filters}
+          isCollapsed={isBottomPanelCollapsed}
           mode={mode}
+          navigationActive={navigationActive}
           onModeChange={handleModeChange}
-          onResizeStart={() => setDragPanel(true)}
+          onResizeStart={() => {
+            setIsBottomPanelCollapsed(false);
+            setDragPanel(true);
+          }}
+          onStartNavigation={handleStartNavigation}
+          onToggleCollapse={() => setIsBottomPanelCollapsed((isCollapsed) => !isCollapsed)}
           panelHeight={panelHeight}
           place={selectedPlace}
           routeLoading={routeLoading}
+          routeOption={selectedRouteOption}
           routeSummaries={routeSummaries}
-          showSidebar={showSidebar}
+          secondaryRouteSummaries={secondaryRouteSummaries}
+          showSidebar={showSidebar && !navigationActive}
         />
       </div>
     </div>
