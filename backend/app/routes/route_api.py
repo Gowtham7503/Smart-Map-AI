@@ -2,6 +2,7 @@ from flask import Blueprint, jsonify, request
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from functools import lru_cache
+import math
 import os
 from urllib.parse import quote
 
@@ -34,6 +35,9 @@ TOMTOM_FLOW_URL = "https://api.tomtom.com/traffic/services/4/flowSegmentData/abs
 OPENWEATHER_AIR_POLLUTION_URL = "https://api.openweathermap.org/data/2.5/air_pollution"
 POI_RADIUS_METERS = 500
 ROUTE_SAMPLE_LIMIT = 5
+TRAFFIC_SAMPLE_INTERVAL_METERS = 1500
+TRAFFIC_SAMPLE_LIMIT = 40
+TRAFFIC_HOTSPOT_THRESHOLD = 0.03
 SCORING_WORKERS = 5
 EXTERNAL_API_TIMEOUT = (2, 4)
 OVERPASS_TIMEOUT = (2, 5)
@@ -42,6 +46,13 @@ WIKIPEDIA_HEADERS = {
     "User-Agent": "smartmap/1.0 (place details lookup)",
     "Accept": "application/json",
 }
+
+
+def empty_traffic_details():
+    return {
+        "samples": [],
+        "hotspots": [],
+    }
 
 
 def get_env_value(name):
@@ -185,6 +196,111 @@ def sample_route_points(decoded_coordinates, sample_limit=ROUTE_SAMPLE_LIMIT):
     return [decoded_coordinates[index] for index in sorted(sample_indexes)]
 
 
+def get_distance_meters(start, end):
+    start_lat, start_lon = start
+    end_lat, end_lon = end
+    radius_meters = 6371000
+    delta_lat = math.radians(end_lat - start_lat)
+    delta_lon = math.radians(end_lon - start_lon)
+    start_lat_rad = math.radians(start_lat)
+    end_lat_rad = math.radians(end_lat)
+    a = (
+        math.sin(delta_lat / 2) ** 2
+        + math.cos(start_lat_rad)
+        * math.cos(end_lat_rad)
+        * math.sin(delta_lon / 2) ** 2
+    )
+    return radius_meters * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+
+def interpolate_coordinate(start, end, ratio):
+    start_lat, start_lon = start
+    end_lat, end_lon = end
+    return (
+        start_lat + (end_lat - start_lat) * ratio,
+        start_lon + (end_lon - start_lon) * ratio,
+    )
+
+
+def sample_route_points_by_distance(
+    decoded_coordinates,
+    interval_meters=TRAFFIC_SAMPLE_INTERVAL_METERS,
+    sample_limit=TRAFFIC_SAMPLE_LIMIT,
+):
+    if not decoded_coordinates:
+        return []
+
+    if len(decoded_coordinates) == 1:
+        return decoded_coordinates
+
+    segment_distances = []
+    total_distance = 0
+
+    for index in range(1, len(decoded_coordinates)):
+        distance = get_distance_meters(
+            decoded_coordinates[index - 1],
+            decoded_coordinates[index],
+        )
+        segment_distances.append(distance)
+        total_distance += distance
+
+    if total_distance == 0:
+        return [decoded_coordinates[0], decoded_coordinates[-1]]
+
+    target_count = min(
+        sample_limit,
+        max(2, math.floor(total_distance / interval_meters) + 1),
+    )
+    target_distances = [
+        min(total_distance, index * interval_meters)
+        for index in range(target_count)
+    ]
+
+    if target_distances[-1] < total_distance and len(target_distances) >= sample_limit:
+        target_distances[-1] = total_distance
+    elif target_distances[-1] < total_distance:
+        target_distances.append(total_distance)
+
+    samples = []
+    segment_start_distance = 0
+    segment_index = 0
+
+    for target_distance in target_distances:
+        while (
+            segment_index < len(segment_distances) - 1
+            and segment_start_distance + segment_distances[segment_index] < target_distance
+        ):
+            segment_start_distance += segment_distances[segment_index]
+            segment_index += 1
+
+        segment_distance = segment_distances[segment_index]
+        if segment_distance == 0:
+            samples.append(decoded_coordinates[segment_index])
+            continue
+
+        ratio = (target_distance - segment_start_distance) / segment_distance
+        samples.append(
+            interpolate_coordinate(
+                decoded_coordinates[segment_index],
+                decoded_coordinates[segment_index + 1],
+                max(0, min(1, ratio)),
+            )
+        )
+
+    unique_samples = []
+    seen_samples = set()
+
+    for lat, lon in samples:
+        key = (round_coordinate(lat), round_coordinate(lon))
+        if key in seen_samples:
+            continue
+
+        seen_samples.add(key)
+        unique_samples.append((lat, lon))
+
+    return unique_samples
+
+
 def round_coordinate(value):
     return round(value, 4)
 
@@ -288,15 +404,17 @@ def fetch_traffic_snapshot(lat, lon):
 
 def get_route_traffic_score(route, mode):
     if not get_traffic_api_key():
-        return None, 0, None
+        return None, 0, None, empty_traffic_details()
 
-    sampled_points = get_route_sample_points(route)
+    sampled_points = get_route_traffic_sample_points(route)
 
     if not sampled_points:
-        return None, 0, None
+        return None, 0, None, empty_traffic_details()
 
     congestion_values = []
     road_closures = 0
+    traffic_sample_details = []
+    traffic_hotspots = []
 
     def fetch_sample(point):
         lat, lon = point
@@ -319,16 +437,24 @@ def get_route_traffic_score(route, mode):
         if current_speed and free_flow_speed:
             congestion_ratio = 1 - min(current_speed / free_flow_speed, 1)
 
-        return congestion_ratio, bool(traffic.get("roadClosure"))
+        return {
+            "latitude": round_coordinate(lat),
+            "longitude": round_coordinate(lon),
+            "congestion": congestion_ratio,
+            "road_closure": bool(traffic.get("roadClosure")),
+            "current_speed": current_speed,
+            "free_flow_speed": free_flow_speed,
+        }
 
     with ThreadPoolExecutor(max_workers=min(SCORING_WORKERS, len(sampled_points))) as executor:
-        traffic_samples = executor.map(fetch_sample, sampled_points)
+        fetched_traffic_samples = executor.map(fetch_sample, sampled_points)
 
-    for sample in traffic_samples:
+    for sample in fetched_traffic_samples:
         if sample is None:
             continue
 
-        congestion_ratio, road_closed = sample
+        congestion_ratio = sample.get("congestion")
+        road_closed = sample.get("road_closure")
 
         if road_closed:
             road_closures += 1
@@ -336,8 +462,19 @@ def get_route_traffic_score(route, mode):
         if congestion_ratio is not None:
             congestion_values.append(congestion_ratio)
 
+        traffic_sample_details.append(sample)
+
+        if (
+            road_closed
+            or (
+                congestion_ratio is not None
+                and congestion_ratio >= TRAFFIC_HOTSPOT_THRESHOLD
+            )
+        ):
+            traffic_hotspots.append(sample)
+
     if not congestion_values and road_closures == 0:
-        return None, 0, None
+        return None, 0, None, empty_traffic_details()
 
     avg_congestion = round(sum(congestion_values) / len(congestion_values), 2) if congestion_values else 0
 
@@ -346,7 +483,15 @@ def get_route_traffic_score(route, mode):
     else:
         traffic_penalty = round(avg_congestion * 0.5 + road_closures * 1.0, 2)
 
-    return avg_congestion, road_closures, min(2.5, traffic_penalty)
+    return (
+        avg_congestion,
+        road_closures,
+        min(2.5, traffic_penalty),
+        {
+            "samples": traffic_sample_details,
+            "hotspots": traffic_hotspots,
+        },
+    )
 
 
 def score_route_for_traffic(route, mode):
@@ -355,13 +500,15 @@ def score_route_for_traffic(route, mode):
     if existing_context:
         return route.get("traffic_score", existing_context.get("traffic_penalty", 0))
 
-    traffic_congestion, road_closures, traffic_penalty = get_route_traffic_score(route, mode)
+    traffic_congestion, road_closures, traffic_penalty, traffic_details = get_route_traffic_score(route, mode)
 
     route["traffic_score"] = traffic_penalty
     route["traffic_context"] = {
         "traffic_congestion": traffic_congestion,
         "traffic_penalty": traffic_penalty,
         "road_closures": road_closures,
+        "traffic_samples": traffic_details.get("samples", []),
+        "traffic_hotspots": traffic_details.get("hotspots", []),
         "evaluated_hour": datetime.now().hour,
         "mode": mode,
     }
@@ -590,6 +737,20 @@ def get_route_sample_points(route):
     return sample_route_points(decoded_coordinates)
 
 
+def get_route_traffic_sample_points(route):
+    geometry = route.get("geometry")
+
+    if not geometry:
+        return []
+
+    try:
+        decoded_coordinates = decode_polyline(geometry)
+    except (TypeError, ValueError, IndexError):
+        return []
+
+    return sample_route_points_by_distance(decoded_coordinates)
+
+
 def build_route_request_body(coordinates, include_alternatives=False, shortest_route=False):
     request_body = {
         "coordinates": coordinates,
@@ -651,7 +812,7 @@ def score_route_for_safety(route, mode, current_hour):
         overpass_future = executor.submit(fetch_safety_signals)
         traffic_future = executor.submit(get_route_traffic_score, route, mode)
         overpass_poi_ids, overpass_street_light_ids = overpass_future.result()
-        traffic_congestion, road_closures, traffic_penalty = traffic_future.result()
+        traffic_congestion, road_closures, traffic_penalty, traffic_details = traffic_future.result()
 
     crowd_score, crowd_bonus = get_route_activity_score(overpass_poi_ids)
     street_light_count, main_road_ratio, lighting_bonus = get_route_lighting_score(
@@ -678,6 +839,8 @@ def score_route_for_safety(route, mode, current_hour):
         "traffic_congestion": traffic_congestion,
         "traffic_penalty": traffic_penalty,
         "road_closures": road_closures,
+        "traffic_samples": traffic_details.get("samples", []),
+        "traffic_hotspots": traffic_details.get("hotspots", []),
         "evaluated_hour": current_hour,
         "mode": mode,
     }
@@ -692,6 +855,8 @@ def score_route_for_safety(route, mode, current_hour):
         "traffic_congestion": traffic_congestion,
         "traffic_penalty": traffic_penalty,
         "road_closures": road_closures,
+        "traffic_samples": traffic_details.get("samples", []),
+        "traffic_hotspots": traffic_details.get("hotspots", []),
         "time_band": time_band,
         "evaluated_hour": current_hour,
     }

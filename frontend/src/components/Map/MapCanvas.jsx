@@ -142,6 +142,7 @@ const MapControls = ({
 };
 
 const MapViewportController = ({
+  focusActive,
   focusBounds,
   focusPosition,
   navigationActive,
@@ -180,13 +181,14 @@ const MapViewportController = ({
       return;
     }
 
-    if (focusPosition) {
+    if (focusActive && focusPosition) {
       map.flyTo(focusPosition, 15, {
         duration: 1,
       });
     }
   }, [
     focusBounds,
+    focusActive,
     focusPosition,
     map,
     navigationActive,
@@ -210,11 +212,182 @@ const getNavigationLabel = (mode) => {
   return "Vehicle";
 };
 
+const getTrafficHotspotLevel = (hotspot) => {
+  if (hotspot?.road_closure || hotspot?.congestion >= 0.65) {
+    return "heavy";
+  }
+
+  if (hotspot?.congestion >= 0.35) {
+    return "moderate";
+  }
+
+  return "slow";
+};
+
+const getTrafficHotspotStyle = (hotspot) => {
+  const level = getTrafficHotspotLevel(hotspot);
+
+  if (level === "heavy") {
+    return {
+      color: "#b91c1c",
+      weight: 9,
+    };
+  }
+
+  if (level === "moderate") {
+    return {
+      color: "#c2410c",
+      weight: 8,
+    };
+  }
+
+  return {
+    color: "#a16207",
+    weight: 7,
+  };
+};
+
+const getTrafficHotspotLabel = (hotspot) => {
+  if (hotspot?.road_closure) {
+    return "Road closure reported";
+  }
+
+  const congestionPercent = Math.round((hotspot?.congestion || 0) * 100);
+
+  if (hotspot?.estimated) {
+    return `Route average traffic slowdown: ${congestionPercent}%`;
+  }
+
+  return `${congestionPercent}% traffic slowdown`;
+};
+
+const getDistanceScore = (point, latitude, longitude) => {
+  const [pointLatitude, pointLongitude] = point;
+  return (
+    (pointLatitude - latitude) ** 2 +
+    (pointLongitude - longitude) ** 2
+  );
+};
+
+const getNearestRouteIndex = (routeCoords, hotspot) => {
+  const latitude = Number(hotspot.latitude);
+  const longitude = Number(hotspot.longitude);
+
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    return -1;
+  }
+
+  let nearestIndex = -1;
+  let nearestScore = Infinity;
+
+  routeCoords.forEach((point, index) => {
+    const score = getDistanceScore(point, latitude, longitude);
+
+    if (score < nearestScore) {
+      nearestScore = score;
+      nearestIndex = index;
+    }
+  });
+
+  return nearestIndex;
+};
+
+const buildTrafficSegments = (routeCoords, trafficHotspots) => {
+  if (!routeCoords.length || !trafficHotspots.length) {
+    return [];
+  }
+
+  const segmentRadius = Math.max(2, Math.ceil(routeCoords.length / 80));
+
+  return trafficHotspots
+    .map((hotspot, index) => {
+      const nearestIndex = getNearestRouteIndex(routeCoords, hotspot);
+
+      if (nearestIndex < 0) {
+        return null;
+      }
+
+      const startIndex = Math.max(0, nearestIndex - segmentRadius);
+      const endIndex = Math.min(routeCoords.length - 1, nearestIndex + segmentRadius);
+      const positions = routeCoords.slice(startIndex, endIndex + 1);
+
+      if (positions.length < 2) {
+        return null;
+      }
+
+      return {
+        endIndex,
+        hotspot,
+        id: `${nearestIndex}-${index}`,
+        positions,
+        startIndex,
+      };
+    })
+    .filter(Boolean);
+};
+
+const buildBaseRouteSegments = (routeCoords, trafficSegments) => {
+  if (!routeCoords.length) {
+    return [];
+  }
+
+  if (!trafficSegments.length) {
+    return [
+      {
+        id: "full",
+        positions: routeCoords,
+      },
+    ];
+  }
+
+  const mergedTrafficRanges = trafficSegments
+    .map((segment) => ({
+      startIndex: segment.startIndex,
+      endIndex: segment.endIndex,
+    }))
+    .sort((first, second) => first.startIndex - second.startIndex)
+    .reduce((ranges, range) => {
+      const previousRange = ranges[ranges.length - 1];
+
+      if (!previousRange || range.startIndex > previousRange.endIndex + 1) {
+        ranges.push({ ...range });
+        return ranges;
+      }
+
+      previousRange.endIndex = Math.max(previousRange.endIndex, range.endIndex);
+      return ranges;
+    }, []);
+
+  const baseSegments = [];
+  let startIndex = 0;
+
+  mergedTrafficRanges.forEach((range, index) => {
+    if (range.startIndex - startIndex >= 1) {
+      baseSegments.push({
+        id: `base-${index}`,
+        positions: routeCoords.slice(startIndex, range.startIndex + 1),
+      });
+    }
+
+    startIndex = range.endIndex;
+  });
+
+  if (routeCoords.length - 1 - startIndex >= 1) {
+    baseSegments.push({
+      id: "base-end",
+      positions: routeCoords.slice(startIndex),
+    });
+  }
+
+  return baseSegments;
+};
+
 const MapCanvas = ({
   endPosition,
   handlePlaceClick,
   hasSelectedPlace,
   mapFocusPosition,
+  mapFocusActive = false,
   navigationActive,
   navigationHeading = 0,
   navigationMode,
@@ -236,7 +409,22 @@ const MapCanvas = ({
   startPosition,
   startLabel,
   endLabel,
+  trafficHotspots = [],
+  showTrafficHotspots = false,
 }) => {
+  const activeRouteCoords =
+    selectedRouteOption === "secondary" && secondaryRouteCoords.length
+      ? secondaryRouteCoords
+      : routeCoords;
+  const trafficSegments = buildTrafficSegments(activeRouteCoords, trafficHotspots);
+  const preferredRouteSegments =
+    showTrafficHotspots && selectedRouteOption === "preferred"
+      ? buildBaseRouteSegments(routeCoords, trafficSegments)
+      : buildBaseRouteSegments(routeCoords, []);
+  const secondaryRouteSegments =
+    showTrafficHotspots && selectedRouteOption === "secondary"
+      ? buildBaseRouteSegments(secondaryRouteCoords, trafficSegments)
+      : buildBaseRouteSegments(secondaryRouteCoords, []);
   const navigationIcon = useMemo(
     () =>
       L.divIcon({
@@ -280,6 +468,7 @@ const MapCanvas = ({
         onOpenChatbot={onOpenChatbot}
       />
       <MapViewportController
+        focusActive={mapFocusActive}
         focusPosition={mapFocusPosition}
         navigationActive={navigationActive}
         navigationPosition={navigationPosition}
@@ -349,10 +538,10 @@ const MapCanvas = ({
         />
       )}
 
-      {secondaryRouteCoords.length > 0 && (
+      {secondaryRouteSegments.map((segment) => (
         <Polyline
-          key={`secondary-${JSON.stringify(secondaryRouteCoords)}`}
-          positions={secondaryRouteCoords}
+          key={`secondary-${segment.id}`}
+          positions={segment.positions}
           pathOptions={{
             color: "#16a34a",
             weight: selectedRouteOption === "secondary" ? 7 : 5,
@@ -363,12 +552,12 @@ const MapCanvas = ({
         >
           <Popup>Second preference route</Popup>
         </Polyline>
-      )}
+      ))}
 
-      {routeCoords.length > 0 && (
+      {preferredRouteSegments.map((segment) => (
         <Polyline
-          key={JSON.stringify(routeCoords)}
-          positions={routeCoords}
+          key={`preferred-${segment.id}`}
+          positions={segment.positions}
           pathOptions={{
             color: "#2ecc71",
             weight: selectedRouteOption === "preferred" ? 7 : 5,
@@ -377,7 +566,7 @@ const MapCanvas = ({
         >
           <Popup>Preferred route</Popup>
         </Polyline>
-      )}
+      ))}
 
       {routeCoords.length > 0 && (
         <Polyline
@@ -409,6 +598,26 @@ const MapCanvas = ({
         />
       )}
 
+      {showTrafficHotspots &&
+        trafficSegments.map((segment) => {
+          const style = getTrafficHotspotStyle(segment.hotspot);
+
+          return (
+            <Polyline
+              key={`traffic-segment-${segment.id}`}
+              positions={segment.positions}
+              pathOptions={{
+                color: style.color,
+                weight: style.weight,
+                opacity: 0.95,
+                lineCap: "round",
+              }}
+            >
+              <Popup>{getTrafficHotspotLabel(segment.hotspot)}</Popup>
+            </Polyline>
+          );
+        })}
+
       {navigationActive && navigationPosition && (
         <Marker
           position={navigationPosition}
@@ -439,6 +648,23 @@ const MapCanvas = ({
           <span>
             <i className="route-map-legend-line secondary" />
             Second option
+          </span>
+        </div>
+      )}
+
+      {showTrafficHotspots && trafficSegments.length > 0 && (
+        <div className="traffic-map-legend" aria-label="Traffic hotspots">
+          <span>
+            <i className="traffic-map-dot slow" />
+            Light traffic
+          </span>
+          <span>
+            <i className="traffic-map-dot moderate" />
+            Moderate traffic
+          </span>
+          <span>
+            <i className="traffic-map-dot heavy" />
+            Heavy traffic
           </span>
         </div>
       )}
