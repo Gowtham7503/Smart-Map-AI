@@ -142,6 +142,66 @@ const buildRouteSummary = (route, routeResponse) => ({
   },
 });
 
+const getRouteTrafficContext = (summary) =>
+  summary?.trafficContext || summary?.safetyContext || null;
+
+const isVisibleTrafficSample = (sample) =>
+  sample?.road_closure || Number(sample?.congestion) >= 0.01;
+
+const buildAverageTrafficMarkers = (routeCoords, trafficContext) => {
+  const averageCongestion = Number(trafficContext?.traffic_congestion);
+
+  if (
+    !Number.isFinite(averageCongestion) ||
+    averageCongestion < 0.01 ||
+    !Array.isArray(routeCoords) ||
+    routeCoords.length === 0
+  ) {
+    return [];
+  }
+
+  const markerCount = Math.min(6, Math.max(2, Math.ceil(routeCoords.length / 18)));
+  const markers = [];
+
+  for (let index = 0; index < markerCount; index += 1) {
+    const routeIndex = Math.round(
+      (index * (routeCoords.length - 1)) / Math.max(1, markerCount - 1),
+    );
+    const [latitude, longitude] = routeCoords[routeIndex] || [];
+
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      continue;
+    }
+
+    markers.push({
+      latitude,
+      longitude,
+      congestion: averageCongestion,
+      road_closure: Boolean(trafficContext?.road_closures),
+      estimated: true,
+    });
+  }
+
+  return markers;
+};
+
+const getVisibleTrafficHotspots = (summary, routeCoords) => {
+  const trafficContext = getRouteTrafficContext(summary);
+  const hotspots = trafficContext?.traffic_hotspots || [];
+
+  if (hotspots.length > 0) {
+    return hotspots;
+  }
+
+  const samples = (trafficContext?.traffic_samples || []).filter(isVisibleTrafficSample);
+
+  if (samples.length > 0) {
+    return samples;
+  }
+
+  return buildAverageTrafficMarkers(routeCoords, trafficContext);
+};
+
 const parseRouteDetails = (routeResponse) => {
   const routes = routeResponse?.routes || [];
   const route = routes[0];
@@ -518,7 +578,6 @@ const MapView = () => {
     setSelectedPlacePosition(null);
     setPlaceDetailsError("");
     setPlaceDetailsLoading(false);
-    setMapFocusPosition(defaultCenter);
     localStorage.removeItem(LAST_SEARCH_STORAGE_KEY);
   };
 
@@ -785,6 +844,18 @@ const MapView = () => {
     }
   };
 
+  const visibleRouteSummaries =
+    selectedRouteOption === "secondary" ? secondaryRouteSummaries : routeSummaries;
+  const activeRouteCoords =
+    selectedRouteOption === "secondary" && secondaryRouteCoords.length
+      ? secondaryRouteCoords
+      : routeCoords;
+  const activeRouteSummary = visibleRouteSummaries[mode] || null;
+  const trafficHotspots = getVisibleTrafficHotspots(
+    activeRouteSummary,
+    activeRouteCoords,
+  );
+
   useEffect(() => {
     const fetchUserData = async () => {
       try {
@@ -925,6 +996,7 @@ const MapView = () => {
           endPosition={endPosition}
           handlePlaceClick={handlePlaceClick}
           hasSelectedPlace={Boolean(selectedPlace)}
+          mapFocusActive={Boolean(searchPosition || selectedPlacePosition)}
           mapFocusPosition={mapFocusPosition}
           onCloseSelectedPlace={handleCloseSelectedPlace}
           onExitNavigation={stopNavigation}
@@ -943,9 +1015,11 @@ const MapView = () => {
           searchOutline={searchOutline}
           searchPosition={searchPosition}
           setHoveredPlace={setHoveredPlace}
+          showTrafficHotspots={filters.traffic}
           showSidebar={showSidebar && !navigationActive}
           startLabel={from}
           startPosition={startPosition}
+          trafficHotspots={trafficHotspots}
         />
 
         {showChatbot && (

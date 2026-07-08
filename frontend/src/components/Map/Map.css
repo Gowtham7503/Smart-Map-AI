@@ -491,6 +491,53 @@
   border-top-style: dotted;
 }
 
+.traffic-map-legend {
+  position: absolute;
+  left: 16px;
+  bottom: 62px;
+  z-index: 1000;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 9px 12px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.14);
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.traffic-map-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.traffic-map-dot {
+  width: 24px;
+  height: 0;
+  border-top: 5px solid #f97316;
+  border-radius: 999px;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.18);
+}
+
+.traffic-map-dot.slow {
+  border-top-color: #facc15;
+  box-shadow: 0 0 0 3px rgba(250, 204, 21, 0.22);
+}
+
+.traffic-map-dot.moderate {
+  border-top-color: #f97316;
+}
+
+.traffic-map-dot.heavy {
+  border-top-color: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
+}
+
 /* Bottom panel */
 .bottom-panel {
   position: absolute;
@@ -810,6 +857,14 @@
   background-color: transparent;
   border: 0;
   cursor: pointer;
+  color: #666;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mic-icon.listening {
+  color: #0b57d0;
 }
 
 .search-directions-btn {

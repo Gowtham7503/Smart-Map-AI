@@ -1,3 +1,5 @@
+import { useRef, useState } from "react";
+
 const MapSearchBar = ({
   onDirectionsClick,
   onMenuClick,
@@ -8,7 +10,15 @@ const MapSearchBar = ({
   searchQuery,
   showSidebar,
 }) => {
+  const recognitionRef = useRef(null);
+  const [isListening, setIsListening] = useState(false);
+
   const handleVoiceSearch = () => {
+    if (isListening) {
+      recognitionRef.current?.stop();
+      return;
+    }
+
     const SpeechRecognition =
       window.SpeechRecognition || window.webkitSpeechRecognition;
 
@@ -21,9 +31,10 @@ const MapSearchBar = ({
     recognition.lang = "en-IN";
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
+    recognitionRef.current = recognition;
 
     recognition.onstart = () => {
-      console.log("Voice recognition started...");
+      setIsListening(true);
     };
 
     recognition.onresult = async (event) => {
@@ -40,10 +51,29 @@ const MapSearchBar = ({
 
     recognition.onerror = (event) => {
       console.error("Voice error:", event.error);
-      alert("Voice recognition error");
+
+      if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+        alert("Please allow microphone access to use voice search.");
+        return;
+      }
+
+      if (event.error === "no-speech" || event.error === "aborted") {
+        return;
+      }
     };
 
-    recognition.start();
+    recognition.onend = () => {
+      setIsListening(false);
+      recognitionRef.current = null;
+    };
+
+    try {
+      recognition.start();
+    } catch (error) {
+      console.error("Unable to start voice recognition:", error);
+      setIsListening(false);
+      recognitionRef.current = null;
+    }
   };
 
   return (
@@ -95,9 +125,9 @@ const MapSearchBar = ({
 
         <button
           type="button"
-          className="mic-icon"
+          className={`mic-icon ${isListening ? "listening" : ""}`}
           onClick={handleVoiceSearch}
-          aria-label="Voice search"
+          aria-label={isListening ? "Stop voice search" : "Voice search"}
           disabled={searchLoading}
         >
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none">
