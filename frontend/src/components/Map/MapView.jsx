@@ -13,6 +13,10 @@ import Chatbot from "../Chatbot/Chatbot";
 const defaultCenter = [17.4948, 78.3996];
 const LAST_SEARCH_STORAGE_KEY = "smartmap:last-search";
 const directionsGeocodeCache = new Map();
+const MODE_SPEED_RANGES_KMH = {
+  car: { min: 60, max: 80 },
+  bike: { min: 30, max: 50 },
+};
 
 const formatBackendError = (details, seen = new WeakSet()) => {
   if (!details) {
@@ -97,50 +101,66 @@ const decodeRouteCoords = (route) => {
   return polyline.decode(route.geometry).map(([lat, lng]) => [lat, lng]);
 };
 
-const buildRouteSummary = (route, routeResponse) => ({
-  distanceKm: (route.summary?.distance || 0) / 1000,
-  durationMinutes: (route.summary?.duration || 0) / 60,
-  safetyScore:
-    route.safety_score == null ? null : Number(route.safety_score),
-  safetyContext: route.safety_context || null,
-  pollutionScore:
-    route.pollution_score == null ? null : Number(route.pollution_score),
-  pollutionContext: route.pollution_context || null,
-  trafficScore:
-    route.traffic_score == null ? null : Number(route.traffic_score),
-  trafficContext: route.traffic_context || null,
-  routeSelection: {
-    selectedForSafety: Boolean(route.selected_for_safety),
-    selectionReason: route.selection_reason || null,
-    alternativesReturned:
-      routeResponse?.metadata?.alternatives_returned ?? null,
-    safestRouteEnabled: Boolean(
-      routeResponse?.metadata?.safest_route_enabled,
-    ),
-    safestRouteFallback:
-      routeResponse?.metadata?.safest_route_fallback || null,
-    selectedForPollution: Boolean(route.selected_for_pollution),
-    lowPollutionRouteEnabled: Boolean(
-      routeResponse?.metadata?.low_pollution_route_enabled,
-    ),
-    lowPollutionRouteFallback:
-      routeResponse?.metadata?.low_pollution_route_fallback || null,
-    selectedForTraffic: Boolean(route.selected_for_traffic),
-    trafficRouteEnabled: Boolean(
-      routeResponse?.metadata?.traffic_route_enabled,
-    ),
-    trafficRouteFallback:
-      routeResponse?.metadata?.traffic_route_fallback || null,
-    selectedForCombinedEnvironment: Boolean(
-      route.selected_for_combined_environment,
-    ),
-    combinedEnvironmentRouteEnabled: Boolean(
-      routeResponse?.metadata?.combined_environment_route_enabled,
-    ),
-    selectedRouteStrategy:
-      routeResponse?.metadata?.selected_route_strategy || null,
-  },
-});
+const buildRouteSummary = (route, routeResponse, mode) => {
+  const distanceKm = (route.summary?.distance || 0) / 1000;
+  const originalDurationMinutes = (route.summary?.duration || 0) / 60;
+  const speedRangeKmh = MODE_SPEED_RANGES_KMH[mode] || null;
+  const averageSpeedKmh = speedRangeKmh
+    ? (speedRangeKmh.min + speedRangeKmh.max) / 2
+    : route.summary?.distance && route.summary?.duration
+      ? (route.summary.distance / 1000) / (route.summary.duration / 3600)
+      : null;
+
+  return {
+    distanceKm,
+    durationMinutes:
+      distanceKm && averageSpeedKmh
+        ? (distanceKm / averageSpeedKmh) * 60
+        : originalDurationMinutes,
+    averageSpeedKmh,
+    speedRangeKmh,
+    safetyScore:
+      route.safety_score == null ? null : Number(route.safety_score),
+    safetyContext: route.safety_context || null,
+    pollutionScore:
+      route.pollution_score == null ? null : Number(route.pollution_score),
+    pollutionContext: route.pollution_context || null,
+    trafficScore:
+      route.traffic_score == null ? null : Number(route.traffic_score),
+    trafficContext: route.traffic_context || null,
+    routeSelection: {
+      selectedForSafety: Boolean(route.selected_for_safety),
+      selectionReason: route.selection_reason || null,
+      alternativesReturned:
+        routeResponse?.metadata?.alternatives_returned ?? null,
+      safestRouteEnabled: Boolean(
+        routeResponse?.metadata?.safest_route_enabled,
+      ),
+      safestRouteFallback:
+        routeResponse?.metadata?.safest_route_fallback || null,
+      selectedForPollution: Boolean(route.selected_for_pollution),
+      lowPollutionRouteEnabled: Boolean(
+        routeResponse?.metadata?.low_pollution_route_enabled,
+      ),
+      lowPollutionRouteFallback:
+        routeResponse?.metadata?.low_pollution_route_fallback || null,
+      selectedForTraffic: Boolean(route.selected_for_traffic),
+      trafficRouteEnabled: Boolean(
+        routeResponse?.metadata?.traffic_route_enabled,
+      ),
+      trafficRouteFallback:
+        routeResponse?.metadata?.traffic_route_fallback || null,
+      selectedForCombinedEnvironment: Boolean(
+        route.selected_for_combined_environment,
+      ),
+      combinedEnvironmentRouteEnabled: Boolean(
+        routeResponse?.metadata?.combined_environment_route_enabled,
+      ),
+      selectedRouteStrategy:
+        routeResponse?.metadata?.selected_route_strategy || null,
+    },
+  };
+};
 
 const getRouteTrafficContext = (summary) =>
   summary?.trafficContext || summary?.safetyContext || null;
@@ -202,7 +222,7 @@ const getVisibleTrafficHotspots = (summary, routeCoords) => {
   return buildAverageTrafficMarkers(routeCoords, trafficContext);
 };
 
-const parseRouteDetails = (routeResponse) => {
+const parseRouteDetails = (routeResponse, mode) => {
   const routes = routeResponse?.routes || [];
   const route = routes[0];
   const secondaryRoute = routes[1];
@@ -214,9 +234,9 @@ const parseRouteDetails = (routeResponse) => {
   return {
     coords: decodeRouteCoords(route),
     secondaryCoords: decodeRouteCoords(secondaryRoute),
-    summary: buildRouteSummary(route, routeResponse),
+    summary: buildRouteSummary(route, routeResponse, mode),
     secondarySummary: secondaryRoute
-      ? buildRouteSummary(secondaryRoute, routeResponse)
+      ? buildRouteSummary(secondaryRoute, routeResponse, mode)
       : null,
   };
 };
@@ -458,13 +478,16 @@ const MapView = () => {
         [end[1], end[0]],
       ];
       const requestRoute = getRouteRequest(filters);
+      const travelModes = preserveExistingModes
+        ? [preferredMode]
+        : ["car", "bike", "walk"];
       const routeResponses = await Promise.allSettled(
-        [preferredMode].map(async (travelMode) => {
+        travelModes.map(async (travelMode) => {
           const response = await requestRoute(coordinates, travelMode, filters);
 
           return {
             mode: travelMode,
-            ...parseRouteDetails(response.data),
+            ...parseRouteDetails(response.data, travelMode),
           };
         }),
       );

@@ -1,17 +1,30 @@
-﻿import "./Home.css";
-import mapBright from "../assets/mapbright.png";
+import "./Home.css";
+import bannerImage1 from "../assets/banner-image1.jpg";
+import bannerImage2 from "../assets/banner-image2.jpg";
+import bannerImage3 from "../assets/banner-image3.jpg";
+import bannerImage4 from "../assets/banner-image4.jpg";
+import bannerImage5 from "../assets/banner-image5.jpg";
+import bannerImage6 from "../assets/banner-image6.jpg";
 import smartMapsLogo from "../assets/smartmaps_logo.svg";
 import { useNavigate } from "react-router-dom";
 
+const bannerImages = [
+  bannerImage1,
+  bannerImage2,
+  bannerImage3,
+  bannerImage4,
+  bannerImage5,
+  bannerImage6,
+];
+
 const Home = () => {
   const navigate = useNavigate();
+
   return (
     <div className="home-page">
-      {/* ?? NAVBAR */}
       <header className="navbar">
         <img className="brand-logo-img home-logo" src={smartMapsLogo} alt="SmartMaps" />
 
-        {/* ? FIXED: use ul > li */}
         <ul className="nav-links">
           <li>About us</li>
           <li>Features</li>
@@ -19,19 +32,25 @@ const Home = () => {
         </ul>
       </header>
 
-      {/* ?? HERO SECTION */}
-      <main
-        className="hero-section"
-        style={{
-          background: `url(${mapBright}) center/cover no-repeat`,
-        }}
-      >
-        {/* ?? OVERLAY */}
+      <main className="hero-section">
+        <div
+          className="banner-slideshow"
+          style={{ "--first-banner-image": `url(${bannerImages[0]})` }}
+          aria-hidden="true"
+        >
+          {bannerImages.map((image, index) => (
+            <img
+              alt=""
+              className="banner-slide"
+              key={image}
+              src={image}
+              style={{ animationDelay: `${index * 5}s` }}
+            />
+          ))}
+        </div>
         <div className="overlay"></div>
 
-        {/* ?? HERO CONTENT */}
-        <div className="hero-content">        
-
+        <div className="hero-content">
           <h1>
             Smart <span id="nav-green">Navigation</span>
             <br />
