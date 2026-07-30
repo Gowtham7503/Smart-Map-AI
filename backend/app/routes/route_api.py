@@ -5,7 +5,6 @@ from functools import lru_cache
 import math
 import os
 from urllib.parse import quote
-
 from dotenv import dotenv_values, load_dotenv
 import requests
 
