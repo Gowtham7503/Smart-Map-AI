@@ -40,6 +40,29 @@ const formatDistance = (kilometers) => {
   return `${kilometers.toFixed(1)} km`;
 };
 
+const formatVelocity = (kilometersPerHour, speedRange) => {
+  if (speedRange?.min != null && speedRange?.max != null) {
+    return `${speedRange.min}-${speedRange.max} km/h`;
+  }
+
+  if (kilometersPerHour == null) {
+    return "--";
+  }
+
+  return `${kilometersPerHour.toFixed(1)} km/h`;
+};
+
+const formatModeSummary = (summary) => {
+  const duration = formatDuration(summary?.durationMinutes);
+  const velocity = formatVelocity(summary?.averageSpeedKmh, summary?.speedRangeKmh);
+
+  if (duration === "--" && velocity === "--") {
+    return "--";
+  }
+
+  return `${duration} | ${velocity}`;
+};
+
 const formatSafetyScore = (score) => {
   if (score == null) {
     return "--";
@@ -300,7 +323,7 @@ const MapBottomPanel = ({
             </svg>
             <div className="vehicle-btn-copy">
               <span>Car</span>
-              <small>{formatDuration(visibleRouteSummaries.car?.durationMinutes)}</small>
+              <small>{formatModeSummary(visibleRouteSummaries.car)}</small>
             </div>
           </div>
 
@@ -359,7 +382,7 @@ const MapBottomPanel = ({
             </svg>
             <div className="vehicle-btn-copy">
               <span>Bike</span>
-              <small>{formatDuration(visibleRouteSummaries.bike?.durationMinutes)}</small>
+              <small>{formatModeSummary(visibleRouteSummaries.bike)}</small>
             </div>
           </div>
 
@@ -408,7 +431,7 @@ const MapBottomPanel = ({
             </svg>
             <div className="vehicle-btn-copy">
               <span>Walk</span>
-              <small>{formatDuration(visibleRouteSummaries.walk?.durationMinutes)}</small>
+              <small>{formatModeSummary(visibleRouteSummaries.walk)}</small>
             </div>
           </div>
         </div>
@@ -427,6 +450,15 @@ const MapBottomPanel = ({
           <div className="route-summary-item">
             <p className="route-summary-label">Distance</p>
             <strong>{routeLoading ? "Calculating..." : formatDistance(activeSummary?.distanceKm)}</strong>
+          </div>
+
+          <div className="route-summary-item">
+            <p className="route-summary-label">Average velocity</p>
+            <strong>
+              {routeLoading
+                ? "Calculating..."
+                : formatVelocity(activeSummary?.averageSpeedKmh, activeSummary?.speedRangeKmh)}
+            </strong>
           </div>
 
           {filters?.safest && (
