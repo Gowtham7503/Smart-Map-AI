@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import smartMapsLogo from "../../assets/smartmaps_logo.svg";
+import smartMapsLogo from "../../assets/smartmaps_logo_dark.svg";
 import { logoutUser } from "../../services/api";
 
 const MapSidebar = ({

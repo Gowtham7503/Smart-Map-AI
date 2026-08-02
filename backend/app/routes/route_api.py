@@ -40,7 +40,7 @@ TRAFFIC_HOTSPOT_THRESHOLD = 0.03
 SCORING_WORKERS = 5
 EXTERNAL_API_TIMEOUT = (2, 4)
 OVERPASS_TIMEOUT = (2, 5)
-ORS_TIMEOUT = (3, 12)
+ORS_TIMEOUT = None
 WIKIPEDIA_HEADERS = {
     "User-Agent": "smartmap/1.0 (place details lookup)",
     "Accept": "application/json",

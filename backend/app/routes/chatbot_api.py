@@ -1,5 +1,7 @@
 from functools import lru_cache
 from math import asin, cos, radians, sin, sqrt
+import json
+import os
 import re
 
 from flask import Blueprint, jsonify, request
@@ -20,6 +22,9 @@ OVERPASS_HEADERS = {
 }
 DEFAULT_RADIUS_METERS = 2000
 MAX_RECOMMENDATIONS = 6
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_GEMINI_API_KEY")
+GEMINI_TIMEOUT = (3, 12)
 
 CATEGORY_KEYWORDS = {
     "restaurant": (
@@ -58,6 +63,97 @@ CATEGORY_LABELS = {
     "attraction": "famous places",
 }
 
+DIRECTION_KEYWORDS = {
+    "directions",
+    "direction",
+    "route",
+    "navigate",
+    "navigation",
+    "go",
+    "travel",
+    "drive",
+    "walk",
+    "bike",
+    "cycling",
+}
+
+MODE_KEYWORDS = {
+    "car": ("car", "drive", "driving", "cab", "taxi"),
+    "bike": ("bike", "bicycle", "cycle", "cycling"),
+    "walk": ("walk", "walking", "foot"),
+}
+
+FILTER_KEYWORDS = {
+    "safest": ("safe", "safest", "safety", "secure"),
+    "pollution": ("pollution", "clean", "cleanest", "air quality", "less polluted"),
+    "traffic": ("traffic", "jam", "congestion", "fastest", "less traffic"),
+}
+
+FILTER_OFF_KEYWORDS = {
+    "safest": (
+        "no safe",
+        "no safest",
+        "disable safe",
+        "disable safest",
+        "remove safe",
+        "remove safest",
+        "turn off safe",
+        "turn off safest",
+        "without safe",
+        "without safest",
+        "not safe",
+        "not safest",
+    ),
+    "pollution": (
+        "no pollution",
+        "no low pollution",
+        "disable pollution",
+        "disable low pollution",
+        "remove pollution",
+        "remove low pollution",
+        "remove clean route",
+        "remove cleaner route",
+        "turn off pollution",
+        "turn off low pollution",
+        "without pollution",
+        "without low pollution",
+        "dont avoid pollution",
+        "don't avoid pollution",
+        "dont use low pollution",
+        "don't use low pollution",
+    ),
+    "traffic": (
+        "no traffic",
+        "disable traffic",
+        "remove traffic",
+        "turn off traffic",
+        "without traffic",
+        "dont avoid traffic",
+        "don't avoid traffic",
+    ),
+}
+
+CLEAR_FILTER_KEYWORDS = (
+    "clear filters",
+    "remove filters",
+    "no filters",
+    "normal route",
+    "standard route",
+    "default route",
+    "regular route",
+)
+
+TRAILING_ROUTE_QUALIFIER_PATTERNS = (
+    r"\s+(?:with|using|use|apply|applying|enable|enabled|by)\s+.*\b(?:filter|filters|route|routing|traffic|pollution|safest|safety|safe|clean|cleanest|fastest)\b.*$",
+    r"\s+(?:and\s+)?(?:avoid|less|low|lowest|minimum|minimize)\s+.*\b(?:traffic|pollution|congestion)\b.*$",
+    r"\s+(?:and\s+)?(?:safe|safest|secure|fastest|clean|cleanest)\s+(?:route|routing|way)\b.*$",
+)
+
+LEADING_ROUTE_WORD_PATTERN = (
+    r"^(?:i\s+need\s+to\s+|i\s+want\s+to\s+|please\s+)?"
+    r"(?:go|goto|navigate|travel|drive|walk|bike|route|directions?)\s+"
+)
+
 
 def parse_number(value):
     try:
@@ -78,6 +174,284 @@ def detect_category(message):
         return "attraction"
 
     return None
+
+
+def get_default_filters():
+    return {
+        "safest": False,
+        "pollution": False,
+        "traffic": False,
+    }
+
+
+def detect_mode(message):
+    normalized_message = message.lower()
+
+    for mode, keywords in MODE_KEYWORDS.items():
+        if any(keyword in normalized_message for keyword in keywords):
+            return mode
+
+    return None
+
+
+def detect_filters(message):
+    normalized_message = message.lower()
+    filters = get_default_filters()
+
+    for filter_name, keywords in FILTER_KEYWORDS.items():
+        if any(keyword in normalized_message for keyword in keywords):
+            filters[filter_name] = True
+
+    return filters
+
+
+def has_filter_change(message):
+    normalized_message = message.lower()
+    return (
+        any(keyword in normalized_message for keyword in CLEAR_FILTER_KEYWORDS)
+        or any(
+        any(keyword in normalized_message for keyword in keywords)
+        for keywords in (*FILTER_KEYWORDS.values(), *FILTER_OFF_KEYWORDS.values())
+        )
+    )
+
+
+def apply_filter_changes(base_filters, message):
+    normalized_message = message.lower()
+    filters = {
+        **get_default_filters(),
+        **(base_filters or {}),
+    }
+
+    if any(keyword in normalized_message for keyword in CLEAR_FILTER_KEYWORDS):
+        filters = get_default_filters()
+
+    for filter_name, keywords in FILTER_KEYWORDS.items():
+        if any(keyword in normalized_message for keyword in keywords):
+            filters[filter_name] = True
+
+    for filter_name, keywords in FILTER_OFF_KEYWORDS.items():
+        if any(keyword in normalized_message for keyword in keywords):
+            filters[filter_name] = False
+
+    return filters
+
+
+def normalize_place_name(place):
+    if not place:
+        return ""
+
+    normalized_place = re.sub(r"\s+", " ", place).strip(" .,!?:;\"'")
+    normalized_place = re.sub(
+        LEADING_ROUTE_WORD_PATTERN,
+        "",
+        normalized_place,
+        flags=re.IGNORECASE,
+    ).strip(" .,!?:;\"'")
+
+    for pattern in TRAILING_ROUTE_QUALIFIER_PATTERNS:
+        normalized_place = re.sub(
+            pattern,
+            "",
+            normalized_place,
+            flags=re.IGNORECASE,
+        ).strip(" .,!?:;\"'")
+
+    if normalized_place.lower() in {"my location", "current location"}:
+        return "My Location"
+
+    return normalized_place
+
+
+def parse_direction_intent_with_patterns(message):
+    normalized_message = re.sub(r"\s+", " ", message).strip()
+    direction_words = set(re.sub(r"[^a-z0-9\s]", " ", normalized_message.lower()).split())
+    has_direction_keyword = bool(direction_words.intersection(DIRECTION_KEYWORDS))
+
+    patterns = (
+        r"^(?:.*?\b)?from\s+(?P<from>.+?)\s+(?:to|towards?)\s+(?P<to>.+)$",
+        r"^(?:.*?\b)?between\s+(?P<from>.+?)\s+and\s+(?P<to>.+)$",
+        r"^(?:.*?\b)?(?:to|towards?)\s+(?P<to>.+?)\s+from\s+(?P<from>.+)$",
+        r"^(?:i\s+need\s+to\s+|i\s+want\s+to\s+|please\s+)?(?:go|goto|navigate|travel|drive|walk|bike)\s+(?:to\s+|towards\s+)?(?P<to>.+)$",
+        r"^(?P<from>.+?)\s+(?:to|towards?)\s+(?P<to>.+)$",
+    )
+
+    for index, pattern in enumerate(patterns):
+        match = re.search(pattern, normalized_message, flags=re.IGNORECASE)
+
+        if not match:
+            continue
+
+        is_simple_to_pattern = index == len(patterns) - 1
+
+        if is_simple_to_pattern and not has_direction_keyword:
+            category = detect_category(message)
+            if category is not None:
+                return None
+
+        origin = normalize_place_name(match.groupdict().get("from") or "My Location")
+        destination = normalize_place_name(match.groupdict().get("to"))
+
+        if origin and destination:
+            return {
+                "type": "directions",
+                "from": origin,
+                "to": destination,
+                "mode": detect_mode(message),
+                "filters": detect_filters(message),
+            }
+
+    return None
+
+
+def parse_json_object(text):
+    if not text:
+        return None
+
+    cleaned_text = text.strip()
+    fenced_match = re.search(
+        r"```(?:json)?\s*(\{.*?\})\s*```",
+        cleaned_text,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+
+    if fenced_match:
+        cleaned_text = fenced_match.group(1)
+    else:
+        object_match = re.search(r"\{.*\}", cleaned_text, flags=re.DOTALL)
+        if object_match:
+            cleaned_text = object_match.group(0)
+
+    try:
+        return json.loads(cleaned_text)
+    except json.JSONDecodeError:
+        return None
+
+
+def parse_direction_intent_with_gemini(message):
+    if not GEMINI_API_KEY:
+        return None
+
+    prompt = (
+        "Extract a map direction intent from this user message. "
+        "Return only JSON with this shape: "
+        '{"is_direction": boolean, "from": string|null, "to": string|null, '
+        '"mode": "car"|"bike"|"walk"|null, '
+        '"filters": {"safest": boolean, "pollution": boolean, "traffic": boolean}}. '
+        "Use null when a location is missing. Interpret 'my location' or "
+        "'current location' as 'My Location'. Enable filters only when the user asks "
+        "for safer, cleaner/low pollution, or lower-traffic/fastest routing. "
+        "The from and to values must contain only place names; do not include "
+        "words about route filters, traffic, pollution, safety, mode, or phrases "
+        "like 'with filter applied'. "
+        f"Message: {message}"
+    )
+    endpoint = (
+        f"https://generativelanguage.googleapis.com/v1beta/models/"
+        f"{GEMINI_MODEL}:generateContent"
+    )
+
+    try:
+        response = requests.post(
+            endpoint,
+            headers={"x-goog-api-key": GEMINI_API_KEY},
+            json={"contents": [{"parts": [{"text": prompt}]}]},
+            timeout=GEMINI_TIMEOUT,
+        )
+        response.raise_for_status()
+    except requests.RequestException:
+        return None
+
+    parts = (
+        response.json()
+        .get("candidates", [{}])[0]
+        .get("content", {})
+        .get("parts", [])
+    )
+    gemini_text = "\n".join(part.get("text", "") for part in parts)
+    parsed_intent = parse_json_object(gemini_text)
+
+    if not parsed_intent or not parsed_intent.get("is_direction"):
+        return None
+
+    origin = normalize_place_name(parsed_intent.get("from"))
+    destination = normalize_place_name(parsed_intent.get("to"))
+
+    if not origin or not destination:
+        return None
+
+    filters = get_default_filters()
+    filters.update(
+        {
+            key: bool((parsed_intent.get("filters") or {}).get(key, filters[key]))
+            for key in filters
+        }
+    )
+
+    mode = parsed_intent.get("mode")
+    return {
+        "type": "directions",
+        "from": origin,
+        "to": destination,
+        "mode": mode if mode in MODE_KEYWORDS else detect_mode(message),
+        "filters": filters,
+    }
+
+
+def get_last_direction_action(history):
+    if not isinstance(history, list):
+        return None
+
+    for item in reversed(history):
+        if not isinstance(item, dict):
+            continue
+
+        action = item.get("action") or {}
+
+        if action.get("type") != "directions":
+            continue
+
+        origin = normalize_place_name(action.get("from"))
+        destination = normalize_place_name(action.get("to"))
+
+        if not origin or not destination:
+            continue
+
+        return {
+            "type": "directions",
+            "from": origin,
+            "to": destination,
+            "mode": action.get("mode") if action.get("mode") in MODE_KEYWORDS else None,
+            "filters": {
+                **get_default_filters(),
+                **(action.get("filters") or {}),
+            },
+        }
+
+    return None
+
+
+def detect_followup_direction_intent(message, history):
+    previous_action = get_last_direction_action(history)
+
+    if previous_action is None:
+        return None
+
+    next_mode = detect_mode(message) or previous_action.get("mode")
+    next_filters = apply_filter_changes(previous_action.get("filters"), message)
+
+    if not has_filter_change(message) and next_mode == previous_action.get("mode"):
+        return None
+
+    return {
+        **previous_action,
+        "mode": next_mode,
+        "filters": next_filters,
+    }
+
+
+def detect_direction_intent(message):
+    return parse_direction_intent_with_patterns(message) or parse_direction_intent_with_gemini(message)
 
 
 def get_category_query(category, latitude, longitude, radius):
@@ -235,9 +609,38 @@ def get_chatbot_recommendations():
     latitude = parse_number(data.get("latitude"))
     longitude = parse_number(data.get("longitude"))
     location_label = (data.get("location_label") or "the current map area").strip()
+    history = data.get("history") if isinstance(data.get("history"), list) else []
 
     if not message:
         return jsonify({"error": "Please enter a message."}), 400
+
+    direction_intent = (
+        detect_direction_intent(message)
+        or detect_followup_direction_intent(message, history)
+    )
+    if direction_intent:
+        mode_label = direction_intent["mode"] or "car"
+        active_filters = [
+            label
+            for key, label in (
+                ("safest", "safest route"),
+                ("pollution", "low-pollution route"),
+                ("traffic", "lower-traffic route"),
+            )
+            if direction_intent["filters"].get(key)
+        ]
+        filter_label = ", ".join(active_filters) if active_filters else "standard route"
+
+        return jsonify(
+            {
+                "reply": (
+                    f"Finding a {filter_label} by {mode_label} from "
+                    f"{direction_intent['from']} to {direction_intent['to']}."
+                ),
+                "action": direction_intent,
+                "recommendations": [],
+            }
+        )
 
     category = detect_category(message)
     if category is None:
