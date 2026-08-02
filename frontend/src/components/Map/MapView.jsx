@@ -8,7 +8,8 @@ import PlaceHoverCard from "./PlaceHoverCard";
 import "./Map.css";
 import MapSearchBar from "./MapSearchBar";
 import MapSidebar from "./MapSidebar";
-import Chatbot, { DEFAULT_CHATBOT_MESSAGES } from "../Chatbot/Chatbot";
+import Chatbot from "../Chatbot/Chatbot";
+import { DEFAULT_CHATBOT_MESSAGES } from "../Chatbot/chatbotConstants";
 
 const defaultCenter = [17.4948, 78.3996];
 const LAST_SEARCH_STORAGE_KEY = "smartmap:last-search";
@@ -261,7 +262,7 @@ const getSavedSearch = () => {
   }
 };
 
-const MapView = () => {
+const MapView = ({ theme = "bright" }) => {
   const savedSearch = getSavedSearch();
   const isFirstSafetyEffect = useRef(true);
   const routeRequestIdRef = useRef(0);
@@ -1017,6 +1018,7 @@ const MapView = () => {
         setTo={setTo}
         showSidebar={showSidebar && !navigationActive}
         sidebarWidth={sidebarWidth}
+        theme={theme}
         to={to}
         user={user}
       />
@@ -1078,6 +1080,7 @@ const MapView = () => {
           startLabel={from}
           startPosition={startPosition}
           trafficHotspots={trafficHotspots}
+          theme={theme}
         />
 
         {showChatbot && (

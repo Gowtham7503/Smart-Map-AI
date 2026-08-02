@@ -936,3 +936,114 @@ body {
   }
 }
 
+html[data-theme="bright"] body {
+  background: #f7fff9;
+  color: #10241b;
+}
+
+html[data-theme="bright"] .home-page,
+html[data-theme="bright"] .home-sections {
+  background: linear-gradient(180deg, #f7fff9 0%, #eefaf2 100%);
+  color: #10241b;
+}
+
+html[data-theme="bright"] .hero-section {
+  background: #effaf2;
+}
+
+html[data-theme="bright"] .overlay {
+  background:
+    linear-gradient(
+      90deg,
+      rgba(247, 255, 249, 0.94) 0%,
+      rgba(247, 255, 249, 0.78) 38%,
+      rgba(247, 255, 249, 0.34) 70%,
+      rgba(247, 255, 249, 0.08) 100%
+    ),
+    linear-gradient(180deg, rgba(247, 255, 249, 0.15), rgba(247, 255, 249, 0.72));
+}
+
+html[data-theme="bright"] .navbar {
+  color: #10241b;
+}
+
+html[data-theme="bright"] .navbar.scrolled {
+  background: rgba(255, 255, 255, 0.78);
+  border-bottom-color: rgba(39, 174, 96, 0.16);
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.1);
+}
+
+html[data-theme="bright"] .nav-links a,
+html[data-theme="bright"] .hero-content,
+html[data-theme="bright"] .section-heading h2,
+html[data-theme="bright"] .about-card h3,
+html[data-theme="bright"] .contact-card h3,
+html[data-theme="bright"] .why-copy-card h3,
+html[data-theme="bright"] .mini-card h4,
+html[data-theme="bright"] .feature-card h4,
+html[data-theme="bright"] .timeline-card h4,
+html[data-theme="bright"] .testimonial-card h4,
+html[data-theme="bright"] .faq-item summary,
+html[data-theme="bright"] .stat-label,
+html[data-theme="bright"] .tech-card,
+html[data-theme="bright"] .workflow-item,
+html[data-theme="bright"] .vision-card {
+  color: #10241b;
+}
+
+html[data-theme="bright"] .description,
+html[data-theme="bright"] .section-description,
+html[data-theme="bright"] .about-story p,
+html[data-theme="bright"] .about-card p,
+html[data-theme="bright"] .contact-card p,
+html[data-theme="bright"] .why-copy-card p,
+html[data-theme="bright"] .mini-card p,
+html[data-theme="bright"] .feature-card p,
+html[data-theme="bright"] .timeline-card p,
+html[data-theme="bright"] .testimonial-review,
+html[data-theme="bright"] .home-footer,
+html[data-theme="bright"] .home-footer a,
+html[data-theme="bright"] .cta-banner p,
+html[data-theme="bright"] .stat-detail,
+html[data-theme="bright"] .faq-item p,
+html[data-theme="bright"] .contact-details-list a {
+  color: #52665a;
+}
+
+html[data-theme="bright"] .about-card,
+html[data-theme="bright"] .contact-card,
+html[data-theme="bright"] .features-shell,
+html[data-theme="bright"] .why-copy-card,
+html[data-theme="bright"] .mini-card,
+html[data-theme="bright"] .feature-card,
+html[data-theme="bright"] .tech-card,
+html[data-theme="bright"] .testimonial-card,
+html[data-theme="bright"] .faq-item,
+html[data-theme="bright"] .stat-card,
+html[data-theme="bright"] .timeline-card {
+  background: rgba(255, 255, 255, 0.84);
+  border-color: rgba(39, 174, 96, 0.16);
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.08);
+}
+
+html[data-theme="bright"] .cta-banner {
+  background: linear-gradient(135deg, rgba(46, 204, 113, 0.18), rgba(14, 165, 233, 0.1));
+  border-color: rgba(39, 174, 96, 0.2);
+}
+
+html[data-theme="bright"] .hero-btn {
+  background: #10241b;
+  color: #ffffff;
+}
+
+html[data-theme="dark"] .home-page,
+html[data-theme="dark"] .home-sections {
+  background:
+    radial-gradient(circle at 18% 8%, rgba(0, 230, 118, 0.12), transparent 26%),
+    linear-gradient(180deg, #050816 0%, #07111d 54%, #04110d 100%);
+}
+
+html[data-theme="dark"] .navbar.scrolled {
+  background: rgba(3, 8, 18, 0.68);
+}
+

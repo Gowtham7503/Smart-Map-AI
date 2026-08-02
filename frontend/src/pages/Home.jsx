@@ -5,6 +5,7 @@ import bannerImage3 from "../assets/banner-image3.jpg";
 import bannerImage4 from "../assets/banner-image4.jpg";
 import bannerImage5 from "../assets/banner-image5.jpg";
 import bannerImage6 from "../assets/banner-image6.jpg";
+import smartMapsLogoDark from "../assets/smartmaps_logo_dark.svg";
 import smartMapsLogo from "../assets/smartmaps_logo.svg";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -19,7 +20,7 @@ const bannerImages = [
   bannerImage6,
 ];
 
-const Home = () => {
+const Home = ({ theme = "bright" }) => {
   const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState("home");
   const [scrolled, setScrolled] = useState(false);
@@ -64,7 +65,11 @@ const Home = () => {
   return (
     <div className="home-page">
       <header className={`navbar${scrolled ? " scrolled" : ""}`}>
-        <img className="brand-logo-img home-logo" src={smartMapsLogo} alt="SmartMaps" />
+        <img
+          className="brand-logo-img home-logo"
+          src={theme === "dark" ? smartMapsLogo : smartMapsLogoDark}
+          alt="SmartMaps"
+        />
 
         <ul className="nav-links">
           <li>

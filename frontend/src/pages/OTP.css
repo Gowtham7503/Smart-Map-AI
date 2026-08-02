@@ -203,3 +203,63 @@ label {
     padding: 30px 20px;
   }
 }
+
+html[data-theme="dark"] .otp-container {
+  background:
+    radial-gradient(circle at 18% 12%, rgba(55, 217, 120, 0.14), transparent 28%),
+    linear-gradient(135deg, #050816 0%, #07111d 52%, #04110d 100%);
+}
+
+html[data-theme="dark"] .otp-card,
+html[data-theme="dark"] .right-section {
+  background: var(--theme-surface);
+  color: var(--theme-text);
+  box-shadow: var(--theme-shadow);
+}
+
+html[data-theme="dark"] .left-section {
+  background: var(--theme-surface-alt);
+}
+
+html[data-theme="dark"] .right-section h2,
+html[data-theme="dark"] label {
+  color: var(--theme-heading);
+}
+
+html[data-theme="dark"] .sub-text,
+html[data-theme="dark"] .note {
+  color: var(--theme-muted);
+}
+
+html[data-theme="dark"] .otp-form-input,
+html[data-theme="dark"] .otp-inputs input,
+html[data-theme="dark"] .back-btn {
+  background: var(--theme-card);
+  border-color: var(--theme-border);
+  color: var(--theme-text);
+}
+
+html[data-theme="dark"] .sub-text span,
+html[data-theme="dark"] .resend button,
+html[data-theme="dark"] .timer,
+html[data-theme="dark"] .note span {
+  color: var(--theme-accent);
+}
+
+html[data-theme="dark"] .back-btn:hover {
+  background: var(--theme-accent-strong);
+  color: #ffffff;
+}
+
+html[data-theme="bright"] .otp-container {
+  background: #eef7ee;
+}
+
+html[data-theme="bright"] .otp-card,
+html[data-theme="bright"] .right-section {
+  background: #ffffff;
+}
+
+html[data-theme="bright"] .left-section {
+  background: #f4fbf4;
+}

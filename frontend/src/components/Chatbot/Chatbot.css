@@ -241,3 +241,56 @@
 .chatbot-place-card:hover {
   transform: translateY(-2px);
 }
+
+html[data-theme="bright"] .chatbot-container {
+  border-color: rgba(39, 174, 96, 0.18);
+  background:
+    radial-gradient(circle at top left, rgba(46, 204, 113, 0.16), transparent 34%),
+    linear-gradient(160deg, #ffffff 0%, #f8fff9 48%, #eefaf2 100%);
+  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.16);
+}
+
+html[data-theme="bright"] .chatbot-header {
+  color: #10241b;
+  border-bottom-color: rgba(39, 174, 96, 0.16);
+  background: rgba(255, 255, 255, 0.68);
+}
+
+html[data-theme="bright"] .chatbot-title p,
+html[data-theme="bright"] .chatbot-typing {
+  color: #64748b;
+}
+
+html[data-theme="bright"] .chatbot-close-btn,
+html[data-theme="bright"] .chatbot-message.bot,
+html[data-theme="bright"] .chatbot-place-card,
+html[data-theme="bright"] .chatbot-quick-prompts button,
+html[data-theme="bright"] .chatbot-input,
+html[data-theme="bright"] .chatbot-input input {
+  background: #ffffff;
+  color: #10241b;
+  border-color: rgba(39, 174, 96, 0.16);
+}
+
+html[data-theme="bright"] .chatbot-place-card span,
+html[data-theme="bright"] .chatbot-place-card small {
+  color: #64748b;
+}
+
+html[data-theme="bright"] .chatbot-place-card strong {
+  color: #10241b;
+}
+
+html[data-theme="bright"] .chatbot-place-card small {
+  color: #27ae60;
+}
+
+html[data-theme="bright"] .chatbot-input input::placeholder {
+  color: #94a3b8;
+}
+
+html[data-theme="dark"] .chatbot-container {
+  background:
+    radial-gradient(circle at top left, rgba(0, 230, 118, 0.18), transparent 30%),
+    linear-gradient(145deg, #050816 0%, #07111d 46%, #064e3b 100%);
+}

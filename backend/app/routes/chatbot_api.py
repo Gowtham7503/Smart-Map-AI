@@ -89,60 +89,6 @@ FILTER_KEYWORDS = {
     "traffic": ("traffic", "jam", "congestion", "fastest", "less traffic"),
 }
 
-FILTER_OFF_KEYWORDS = {
-    "safest": (
-        "no safe",
-        "no safest",
-        "disable safe",
-        "disable safest",
-        "remove safe",
-        "remove safest",
-        "turn off safe",
-        "turn off safest",
-        "without safe",
-        "without safest",
-        "not safe",
-        "not safest",
-    ),
-    "pollution": (
-        "no pollution",
-        "no low pollution",
-        "disable pollution",
-        "disable low pollution",
-        "remove pollution",
-        "remove low pollution",
-        "remove clean route",
-        "remove cleaner route",
-        "turn off pollution",
-        "turn off low pollution",
-        "without pollution",
-        "without low pollution",
-        "dont avoid pollution",
-        "don't avoid pollution",
-        "dont use low pollution",
-        "don't use low pollution",
-    ),
-    "traffic": (
-        "no traffic",
-        "disable traffic",
-        "remove traffic",
-        "turn off traffic",
-        "without traffic",
-        "dont avoid traffic",
-        "don't avoid traffic",
-    ),
-}
-
-CLEAR_FILTER_KEYWORDS = (
-    "clear filters",
-    "remove filters",
-    "no filters",
-    "normal route",
-    "standard route",
-    "default route",
-    "regular route",
-)
-
 TRAILING_ROUTE_QUALIFIER_PATTERNS = (
     r"\s+(?:with|using|use|apply|applying|enable|enabled|by)\s+.*\b(?:filter|filters|route|routing|traffic|pollution|safest|safety|safe|clean|cleanest|fastest)\b.*$",
     r"\s+(?:and\s+)?(?:avoid|less|low|lowest|minimum|minimize)\s+.*\b(?:traffic|pollution|congestion)\b.*$",
@@ -201,38 +147,6 @@ def detect_filters(message):
     for filter_name, keywords in FILTER_KEYWORDS.items():
         if any(keyword in normalized_message for keyword in keywords):
             filters[filter_name] = True
-
-    return filters
-
-
-def has_filter_change(message):
-    normalized_message = message.lower()
-    return (
-        any(keyword in normalized_message for keyword in CLEAR_FILTER_KEYWORDS)
-        or any(
-        any(keyword in normalized_message for keyword in keywords)
-        for keywords in (*FILTER_KEYWORDS.values(), *FILTER_OFF_KEYWORDS.values())
-        )
-    )
-
-
-def apply_filter_changes(base_filters, message):
-    normalized_message = message.lower()
-    filters = {
-        **get_default_filters(),
-        **(base_filters or {}),
-    }
-
-    if any(keyword in normalized_message for keyword in CLEAR_FILTER_KEYWORDS):
-        filters = get_default_filters()
-
-    for filter_name, keywords in FILTER_KEYWORDS.items():
-        if any(keyword in normalized_message for keyword in keywords):
-            filters[filter_name] = True
-
-    for filter_name, keywords in FILTER_OFF_KEYWORDS.items():
-        if any(keyword in normalized_message for keyword in keywords):
-            filters[filter_name] = False
 
     return filters
 
@@ -398,58 +312,6 @@ def parse_direction_intent_with_gemini(message):
     }
 
 
-def get_last_direction_action(history):
-    if not isinstance(history, list):
-        return None
-
-    for item in reversed(history):
-        if not isinstance(item, dict):
-            continue
-
-        action = item.get("action") or {}
-
-        if action.get("type") != "directions":
-            continue
-
-        origin = normalize_place_name(action.get("from"))
-        destination = normalize_place_name(action.get("to"))
-
-        if not origin or not destination:
-            continue
-
-        return {
-            "type": "directions",
-            "from": origin,
-            "to": destination,
-            "mode": action.get("mode") if action.get("mode") in MODE_KEYWORDS else None,
-            "filters": {
-                **get_default_filters(),
-                **(action.get("filters") or {}),
-            },
-        }
-
-    return None
-
-
-def detect_followup_direction_intent(message, history):
-    previous_action = get_last_direction_action(history)
-
-    if previous_action is None:
-        return None
-
-    next_mode = detect_mode(message) or previous_action.get("mode")
-    next_filters = apply_filter_changes(previous_action.get("filters"), message)
-
-    if not has_filter_change(message) and next_mode == previous_action.get("mode"):
-        return None
-
-    return {
-        **previous_action,
-        "mode": next_mode,
-        "filters": next_filters,
-    }
-
-
 def detect_direction_intent(message):
     return parse_direction_intent_with_patterns(message) or parse_direction_intent_with_gemini(message)
 
@@ -609,15 +471,11 @@ def get_chatbot_recommendations():
     latitude = parse_number(data.get("latitude"))
     longitude = parse_number(data.get("longitude"))
     location_label = (data.get("location_label") or "the current map area").strip()
-    history = data.get("history") if isinstance(data.get("history"), list) else []
 
     if not message:
         return jsonify({"error": "Please enter a message."}), 400
 
-    direction_intent = (
-        detect_direction_intent(message)
-        or detect_followup_direction_intent(message, history)
-    )
+    direction_intent = detect_direction_intent(message)
     if direction_intent:
         mode_label = direction_intent["mode"] or "car"
         active_filters = [

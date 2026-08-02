@@ -1,3 +1,57 @@
+.theme-toggle-btn {
+  position: fixed;
+  left: 18px;
+  bottom: 18px;
+  z-index: 3000;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 112px;
+  height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--theme-border, #d7ddd8);
+  border-radius: 999px;
+  background: var(--theme-surface, #ffffff);
+  color: var(--theme-accent-strong, #27ae60);
+  box-shadow: var(--theme-shadow, 0 10px 30px rgba(15, 23, 42, 0.12));
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.theme-toggle-btn:hover {
+  transform: translateY(-1px);
+  border-color: var(--theme-accent, #2ecc71);
+}
+
+.theme-toggle-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.theme-toggle-label {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.theme-toggle-btn.dashboard-theme-toggle {
+  top: 76px;
+  right: 16px;
+  bottom: auto;
+  left: auto;
+  min-width: 44px;
+  width: 44px;
+  padding: 0;
+}
+
+.theme-toggle-btn.dashboard-theme-toggle .theme-toggle-label {
+  display: none;
+}
+
 .counter {
   font-size: 16px;
   padding: 5px 10px;

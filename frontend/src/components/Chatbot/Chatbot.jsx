@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { getChatbotRecommendations } from "../../services/api";
+import { DEFAULT_CHATBOT_MESSAGES } from "./chatbotConstants";
 import "./Chatbot.css";
 
 const QUICK_PROMPTS = [
@@ -14,13 +15,6 @@ const getHistoryPayload = (messages) =>
     text: message.text,
     action: message.action || null,
   }));
-
-export const DEFAULT_CHATBOT_MESSAGES = [
-  {
-    text: "Hi! I can recommend restaurants, temples, cafes, parks, museums, and famous places near the map.",
-    sender: "bot",
-  },
-];
 
 const Chatbot = ({
   initialMessages = DEFAULT_CHATBOT_MESSAGES,
