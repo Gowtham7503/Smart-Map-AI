@@ -17,12 +17,14 @@ export const getChatbotRecommendations = (
   message,
   position,
   locationLabel,
+  history = [],
 ) => {
   return API.post("/chatbot/recommendations", {
     message,
     latitude: position?.[0] ?? null,
     longitude: position?.[1] ?? null,
     location_label: locationLabel,
+    history,
   });
 };
 

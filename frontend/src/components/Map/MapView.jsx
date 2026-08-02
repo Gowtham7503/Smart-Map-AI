@@ -9,6 +9,7 @@ import "./Map.css";
 import MapSearchBar from "./MapSearchBar";
 import MapSidebar from "./MapSidebar";
 import Chatbot from "../Chatbot/Chatbot";
+import { DEFAULT_CHATBOT_MESSAGES } from "../Chatbot/chatbotConstants";
 
 const defaultCenter = [17.4948, 78.3996];
 const LAST_SEARCH_STORAGE_KEY = "smartmap:last-search";
@@ -86,7 +87,6 @@ const geocodePlaceWithNominatim = async (place, includeGeometry = true) => {
         limit: includeGeometry ? 10 : 5,
         q: place,
       },
-      timeout: 8000,
     },
   );
 
@@ -262,7 +262,7 @@ const getSavedSearch = () => {
   }
 };
 
-const MapView = () => {
+const MapView = ({ theme = "bright" }) => {
   const savedSearch = getSavedSearch();
   const isFirstSafetyEffect = useRef(true);
   const routeRequestIdRef = useRef(0);
@@ -328,6 +328,7 @@ const MapView = () => {
   const [placeDetailsLoading, setPlaceDetailsLoading] = useState(false);
   const [placeDetailsError, setPlaceDetailsError] = useState("");
   const [showChatbot, setShowChatbot] = useState(false);
+  const [chatbotMessages, setChatbotMessages] = useState(DEFAULT_CHATBOT_MESSAGES);
   const [currentLocation, setCurrentLocation] = useState(null);
   const [filters, setFilters] = useState({
     safest: true,
@@ -451,11 +452,15 @@ const MapView = () => {
   const fetchRoute = async (
     preferredMode = mode,
     preserveExistingModes = false,
+    routeOptions = {},
   ) => {
     let requestId = null;
+    const routeFrom = routeOptions.from ?? from;
+    const routeTo = routeOptions.to ?? to;
+    const activeFilters = routeOptions.filters ?? filters;
 
     try {
-      if (!from || !to) {
+      if (!routeFrom || !routeTo) {
         alert("Please enter both locations");
         return;
       }
@@ -465,8 +470,8 @@ const MapView = () => {
       setRouteLoading(true);
 
       const [start, end] = await Promise.all([
-        getCoordinates(from),
-        getCoordinates(to),
+        getCoordinates(routeFrom),
+        getCoordinates(routeTo),
       ]);
 
       setStartPosition(start);
@@ -477,13 +482,13 @@ const MapView = () => {
         [start[1], start[0]],
         [end[1], end[0]],
       ];
-      const requestRoute = getRouteRequest(filters);
+      const requestRoute = getRouteRequest(activeFilters);
       const travelModes = preserveExistingModes
         ? [preferredMode]
         : ["car", "bike", "walk"];
       const routeResponses = await Promise.allSettled(
         travelModes.map(async (travelMode) => {
-          const response = await requestRoute(coordinates, travelMode, filters);
+          const response = await requestRoute(coordinates, travelMode, activeFilters);
 
           return {
             mode: travelMode,
@@ -867,6 +872,37 @@ const MapView = () => {
     }
   };
 
+  const handleChatbotDirectionsIntent = (action) => {
+    const nextFrom = action.from?.trim();
+    const nextTo = action.to?.trim();
+    const nextMode = action.mode || mode;
+    const nextFilters = {
+      safest: Boolean(action.filters?.safest),
+      pollution: Boolean(action.filters?.pollution),
+      traffic: Boolean(action.filters?.traffic),
+    };
+
+    if (!nextFrom || !nextTo) {
+      return;
+    }
+
+    setFrom(nextFrom);
+    setTo(nextTo);
+    setMode(nextMode);
+    setFilters(nextFilters);
+    setShowSidebar(true);
+    setIsBottomPanelCollapsed(false);
+    setSelectedPlace(null);
+    setSelectedPlacePosition(null);
+    setPlaceDetailsError("");
+    setPlaceDetailsLoading(false);
+    fetchRoute(nextMode, false, {
+      from: nextFrom,
+      to: nextTo,
+      filters: nextFilters,
+    });
+  };
+
   const visibleRouteSummaries =
     selectedRouteOption === "secondary" ? secondaryRouteSummaries : routeSummaries;
   const activeRouteCoords =
@@ -982,6 +1018,7 @@ const MapView = () => {
         setTo={setTo}
         showSidebar={showSidebar && !navigationActive}
         sidebarWidth={sidebarWidth}
+        theme={theme}
         to={to}
         user={user}
       />
@@ -1043,13 +1080,17 @@ const MapView = () => {
           startLabel={from}
           startPosition={startPosition}
           trafficHotspots={trafficHotspots}
+          theme={theme}
         />
 
         {showChatbot && (
           <Chatbot
+            initialMessages={chatbotMessages}
             locationLabel="My Current Location"
             mapPosition={currentLocation || mapFocusPosition}
             onClose={() => setShowChatbot(false)}
+            onDirectionsIntent={handleChatbotDirectionsIntent}
+            onMessagesChange={setChatbotMessages}
             onPlaceSelect={handleChatbotPlaceSelect}
           />
         )}

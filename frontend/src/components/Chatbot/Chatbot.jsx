@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { getChatbotRecommendations } from "../../services/api";
+import { DEFAULT_CHATBOT_MESSAGES } from "./chatbotConstants";
 import "./Chatbot.css";
 
 const QUICK_PROMPTS = [
@@ -8,21 +9,30 @@ const QUICK_PROMPTS = [
   "Temples nearby",
 ];
 
+const getHistoryPayload = (messages) =>
+  messages.slice(-10).map((message) => ({
+    sender: message.sender,
+    text: message.text,
+    action: message.action || null,
+  }));
+
 const Chatbot = ({
+  initialMessages = DEFAULT_CHATBOT_MESSAGES,
   locationLabel,
   mapPosition,
   onClose,
+  onDirectionsIntent,
+  onMessagesChange,
   onPlaceSelect,
 }) => {
-  const [messages, setMessages] = useState([
-    {
-      text: "Hi! I can recommend restaurants, temples, cafés, parks, museums, and famous places near the map.",
-      sender: "bot",
-    },
-  ]);
+  const [messages, setMessages] = useState(initialMessages);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef(null);
+
+  useEffect(() => {
+    onMessagesChange?.(messages);
+  }, [messages, onMessagesChange]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -44,15 +54,21 @@ const Chatbot = ({
         trimmedMessage,
         mapPosition,
         locationLabel,
+        getHistoryPayload(messages),
       );
       setMessages((previousMessages) => [
         ...previousMessages,
         {
           text: response.data.reply,
           sender: "bot",
+          action: response.data.action || null,
           recommendations: response.data.recommendations || [],
         },
       ]);
+
+      if (response.data.action?.type === "directions") {
+        onDirectionsIntent?.(response.data.action);
+      }
     } catch (error) {
       setMessages((previousMessages) => [
         ...previousMessages,

@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
-import smartMapsLogo from "../../assets/smartmaps_logo.svg";
+import smartMapsLogoLight from "../../assets/smartmaps_logo.svg";
+import smartMapsLogo from "../../assets/smartmaps_logo_dark.svg";
 import { logoutUser } from "../../services/api";
 
 const MapSidebar = ({
@@ -13,10 +14,12 @@ const MapSidebar = ({
   setTo,
   showSidebar,
   sidebarWidth,
+  theme = "bright",
   to,
   user,
 }) => {
   const navigate = useNavigate();
+  const sidebarLogo = theme === "dark" ? smartMapsLogoLight : smartMapsLogo;
   const handleUserAction = async () => {
     if (!user) {
       navigate("/signin");
@@ -34,7 +37,7 @@ const MapSidebar = ({
   return (
     <div className="sidebar" style={{ width: sidebarWidth }}>
       <div className="logo">
-        <img className="brand-logo-img sidebar-logo" src={smartMapsLogo} alt="SmartMaps" />
+        <img className="brand-logo-img sidebar-logo" src={sidebarLogo} alt="SmartMaps" />
       </div>
 
       <form
