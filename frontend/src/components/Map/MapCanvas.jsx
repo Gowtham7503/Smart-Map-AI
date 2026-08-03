@@ -1,8 +1,10 @@
-import { useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  CircleMarker,
   GeoJSON,
   MapContainer,
   Marker,
+  Pane,
   Popup,
   Polyline,
   Rectangle,
@@ -23,6 +25,126 @@ L.Icon.Default.mergeOptions({
   shadowUrl: markerShadow,
 });
 
+const MAP_STYLES = {
+  default: {
+    label: "Default",
+    url: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+    darkUrl: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+    attribution: "&copy; OpenStreetMap &copy; CARTO",
+    maxZoom: 20,
+  },
+  satellite: {
+    label: "Satellite",
+    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    attribution: "Tiles &copy; Esri",
+    maxZoom: 19,
+  },
+  terrain: {
+    label: "Terrain",
+    url: "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
+    attribution: "Map data &copy; OpenStreetMap contributors, SRTM | Map style &copy; OpenTopoMap",
+    maxZoom: 17,
+  },
+  weather: {
+    label: "Weather",
+    baseStyle: "default",
+    overlay: "weather",
+  },
+  pollution: {
+    label: "Pollution Index",
+    baseStyle: "default",
+    overlay: "pollution",
+  },
+};
+
+const TRANSPORTATION_REFERENCE_URL =
+  "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}";
+const PLACE_LABEL_REFERENCE_URL =
+  "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}";
+const OPENWEATHER_API_KEY = import.meta.env.VITE_OPENWEATHER_API_KEY;
+
+const getAirQualityStyle = (aqi) => {
+  const levels = {
+    1: { color: "#22c55e", label: "Good" },
+    2: { color: "#a3e635", label: "Fair" },
+    3: { color: "#facc15", label: "Moderate" },
+    4: { color: "#fb923c", label: "Poor" },
+    5: { color: "#ef4444", label: "Very Poor" },
+  };
+
+  return levels[aqi] || levels[1];
+};
+
+const PollutionOverlay = () => {
+  const map = useMap();
+  const [samples, setSamples] = useState([]);
+
+  const loadSamples = useCallback(async () => {
+    if (!OPENWEATHER_API_KEY) return;
+
+    const bounds = map.getBounds();
+    const center = bounds.getCenter();
+    const sampleCoordinates = [
+      center,
+      bounds.getNorthWest(),
+      bounds.getNorthEast(),
+      bounds.getSouthWest(),
+      bounds.getSouthEast(),
+    ];
+
+    const results = await Promise.all(
+      sampleCoordinates.map(async ({ lat, lng }) => {
+        try {
+          const response = await fetch(
+            `https://api.openweathermap.org/data/2.5/air_pollution?lat=${lat}&lon=${lng}&appid=${OPENWEATHER_API_KEY}`,
+          );
+          const payload = await response.json();
+          // OpenWeather's air-pollution endpoint returns readings in `list`.
+          // Keep `data` as a fallback for compatibility with older proxies.
+          const dataPoint = payload.list?.[0] || payload.data?.[0];
+
+          if (!response.ok || !dataPoint) return null;
+
+          return { lat, lng, aqi: dataPoint.main.aqi };
+        } catch {
+          return null;
+        }
+      }),
+    );
+
+    setSamples(results.filter(Boolean));
+  }, [map]);
+
+  useEffect(() => {
+    loadSamples();
+    map.on("moveend", loadSamples);
+
+    return () => map.off("moveend", loadSamples);
+  }, [loadSamples, map]);
+
+  return samples.map((sample) => {
+    const airQuality = getAirQualityStyle(sample.aqi);
+
+    return (
+      <CircleMarker
+        center={[sample.lat, sample.lng]}
+        key={`${sample.lat}-${sample.lng}`}
+        pathOptions={{
+          color: airQuality.color,
+          fillColor: airQuality.color,
+          fillOpacity: 0.5,
+          weight: 3,
+        }}
+        radius={16}
+      >
+        <Popup>
+          Air quality: <strong>{airQuality.label}</strong>
+        </Popup>
+      </CircleMarker>
+    );
+  });
+};
+
 const EnableZoom = () => {
   const map = useMap();
 
@@ -38,8 +160,11 @@ const MapControls = ({
   hasSelectedPlace,
   onCloseSelectedPlace,
   onOpenChatbot,
+  mapStyle,
+  onMapStyleChange,
 }) => {
   const map = useMap();
+  const [isMapStyleMenuOpen, setIsMapStyleMenuOpen] = useState(false);
 
   const handleLocate = () => {
     if (!navigator.geolocation) return;
@@ -83,7 +208,14 @@ const MapControls = ({
           </svg>
         </button>
 
-        <button className="map-btn" type="button" aria-label="Map filters">
+        <div className="map-style-control">
+          <button
+            className="map-btn"
+            onClick={() => setIsMapStyleMenuOpen((isOpen) => !isOpen)}
+            type="button"
+            aria-label="Choose map view"
+            aria-expanded={isMapStyleMenuOpen}
+          >
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none">
             <path
               d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2V6z"
@@ -93,7 +225,28 @@ const MapControls = ({
             />
             <path d="M9 4v14M15 6v14" stroke="currentColor" strokeWidth="2" />
           </svg>
-        </button>
+          </button>
+
+          {isMapStyleMenuOpen && (
+            <div className="map-style-menu" role="menu" aria-label="Map view options">
+              {Object.entries(MAP_STYLES).map(([styleKey, style]) => (
+                <button
+                  className={`map-style-option ${mapStyle === styleKey ? "active" : ""}`}
+                  key={styleKey}
+                  onClick={() => {
+                    onMapStyleChange(styleKey);
+                    setIsMapStyleMenuOpen(false);
+                  }}
+                  role="menuitemradio"
+                  aria-checked={mapStyle === styleKey}
+                  type="button"
+                >
+                  {style.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="map-controls-bottom" style={{ bottom: bottomOffset + 12 }}>
@@ -413,10 +566,17 @@ const MapCanvas = ({
   showTrafficHotspots = false,
   theme = "bright",
 }) => {
-  const tileLayerUrl =
-    theme === "dark"
-      ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-      : "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
+  const [mapStyle, setMapStyle] = useState("default");
+  const activeMapStyle = MAP_STYLES[mapStyle];
+  const baseMapStyleKey = activeMapStyle.baseStyle || mapStyle;
+  const baseMapStyle = MAP_STYLES[baseMapStyleKey];
+  const isDarkTheme = theme === "dark";
+  const tileLayerUrl = isDarkTheme && baseMapStyle.darkUrl
+    ? baseMapStyle.darkUrl
+    : baseMapStyle.url;
+  const routeColors = isDarkTheme
+    ? { preferred: "#4ade80", secondary: "#60a5fa", outline: "#93c5fd" }
+    : { preferred: "#2ecc71", secondary: "#16a34a", outline: "#0b57d0" };
   const activeRouteCoords =
     selectedRouteOption === "secondary" && secondaryRouteCoords.length
       ? secondaryRouteCoords
@@ -463,7 +623,7 @@ const MapCanvas = ({
       center={mapFocusPosition}
       zoom={12}
       zoomControl={false}
-      className={`leaflet-map ${navigationActive ? "navigation-map-3d" : ""}`}
+      className={`leaflet-map map-style-${baseMapStyleKey} ${navigationActive ? "navigation-map-3d" : ""}`}
     >
       <EnableZoom />
       <MapControls
@@ -471,6 +631,8 @@ const MapCanvas = ({
         hasSelectedPlace={hasSelectedPlace}
         onCloseSelectedPlace={onCloseSelectedPlace}
         onOpenChatbot={onOpenChatbot}
+        mapStyle={mapStyle}
+        onMapStyleChange={setMapStyle}
       />
       <MapViewportController
         focusActive={mapFocusActive}
@@ -483,9 +645,45 @@ const MapCanvas = ({
       />
 
       <TileLayer
+        key={`${baseMapStyleKey}-${isDarkTheme ? "dark" : "bright"}`}
         url={tileLayerUrl}
-        attribution="&copy; OpenStreetMap &copy; CartoDB"
+        attribution={baseMapStyle.attribution}
+        maxZoom={baseMapStyle.maxZoom}
       />
+      {isDarkTheme && (baseMapStyleKey === "default" || baseMapStyleKey === "satellite") && (
+        <Pane name="dark-map-reference" style={{ zIndex: 250 }}>
+          <TileLayer
+            url={TRANSPORTATION_REFERENCE_URL}
+            attribution="&copy; Esri"
+            opacity={1}
+            maxZoom={19}
+          />
+          {baseMapStyleKey === "default" && (
+            <TileLayer
+              url={PLACE_LABEL_REFERENCE_URL}
+              attribution="&copy; Esri"
+              opacity={1}
+              maxZoom={19}
+            />
+          )}
+        </Pane>
+      )}
+      {mapStyle === "weather" && OPENWEATHER_API_KEY && (
+        <Pane name="weather-overlay" style={{ zIndex: 350 }}>
+          <TileLayer
+            url={`https://tile.openweathermap.org/map/temp_new/{z}/{x}/{y}.png?appid=${OPENWEATHER_API_KEY}`}
+            attribution="&copy; OpenWeather"
+            opacity={0.72}
+            maxZoom={19}
+          />
+        </Pane>
+      )}
+      {mapStyle === "pollution" && OPENWEATHER_API_KEY && <PollutionOverlay />}
+      {(mapStyle === "weather" || mapStyle === "pollution") && !OPENWEATHER_API_KEY && (
+        <div className="map-api-notice">
+          Add <code>VITE_OPENWEATHER_API_KEY</code> to enable this map view.
+        </div>
+      )}
 
       {startPosition &&
         renderInteractiveMarker(
@@ -521,7 +719,7 @@ const MapCanvas = ({
         <GeoJSON
           data={searchOutline}
           style={{
-            color: "#0b57d0",
+            color: routeColors.outline,
             weight: 1,
             opacity: 1,
             fillOpacity: 0,
@@ -534,7 +732,7 @@ const MapCanvas = ({
         <Rectangle
           bounds={searchBounds}
           pathOptions={{
-            color: "#0b57d0",
+            color: routeColors.outline,
             weight: 1,
             opacity: 1,
             fillOpacity: 0,
@@ -548,7 +746,7 @@ const MapCanvas = ({
           key={`secondary-${segment.id}`}
           positions={segment.positions}
           pathOptions={{
-            color: "#16a34a",
+            color: routeColors.secondary,
             weight: selectedRouteOption === "secondary" ? 7 : 5,
             opacity: selectedRouteOption === "secondary" ? 1 : 0.8,
             dashArray: "1 12",
@@ -564,7 +762,7 @@ const MapCanvas = ({
           key={`preferred-${segment.id}`}
           positions={segment.positions}
           pathOptions={{
-            color: "#2ecc71",
+            color: routeColors.preferred,
             weight: selectedRouteOption === "preferred" ? 7 : 5,
             opacity: selectedRouteOption === "preferred" ? 1 : 0.65,
           }}
