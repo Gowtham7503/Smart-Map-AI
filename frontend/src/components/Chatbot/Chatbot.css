@@ -291,6 +291,36 @@ html[data-theme="bright"] .chatbot-input input::placeholder {
 
 html[data-theme="dark"] .chatbot-container {
   background:
-    radial-gradient(circle at top left, rgba(0, 230, 118, 0.18), transparent 30%),
-    linear-gradient(145deg, #050816 0%, #07111d 46%, #064e3b 100%);
+    radial-gradient(circle at top left, rgba(74, 222, 128, 0.18), transparent 30%),
+    linear-gradient(145deg, var(--theme-surface) 0%, var(--theme-card) 46%, #153c30 100%);
+  border-color: var(--theme-border);
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.42);
+}
+
+html[data-theme="dark"] .chatbot-header,
+html[data-theme="dark"] .chatbot-message.bot,
+html[data-theme="dark"] .chatbot-place-card,
+html[data-theme="dark"] .chatbot-quick-prompts button,
+html[data-theme="dark"] .chatbot-input,
+html[data-theme="dark"] .chatbot-input input {
+  background: rgba(28, 44, 69, 0.92);
+  border-color: var(--theme-border);
+  color: var(--theme-text);
+}
+
+html[data-theme="dark"] .chatbot-title p,
+html[data-theme="dark"] .chatbot-place-card span,
+html[data-theme="dark"] .chatbot-typing,
+html[data-theme="dark"] .chatbot-input input::placeholder {
+  color: var(--theme-muted);
+}
+
+html[data-theme="dark"] .chatbot-place-card strong,
+html[data-theme="dark"] .chatbot-message.user {
+  color: var(--theme-heading);
+}
+
+html[data-theme="dark"] .chatbot-input input:focus {
+  border-color: var(--theme-accent);
+  box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.16);
 }

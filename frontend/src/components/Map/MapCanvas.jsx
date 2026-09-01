@@ -15,6 +15,7 @@ import L from "leaflet";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
+import { getMapPollutionSamples, getMapWeatherSamples } from "../../services/api";
 import "leaflet/dist/leaflet.css";
 
 delete L.Icon.Default.prototype._getIconUrl;
@@ -61,18 +62,74 @@ const TRANSPORTATION_REFERENCE_URL =
   "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}";
 const PLACE_LABEL_REFERENCE_URL =
   "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}";
-const OPENWEATHER_API_KEY = import.meta.env.VITE_OPENWEATHER_API_KEY;
+const getAirQualityStyle = (aqi, standard) => {
+  if (standard === "openweather") {
+    const levels = {
+      1: { color: "#22c55e", label: "Good" }, 2: { color: "#a3e635", label: "Fair" },
+      3: { color: "#facc15", label: "Moderate" }, 4: { color: "#fb923c", label: "Poor" },
+      5: { color: "#ef4444", label: "Very Poor" },
+    };
+    return levels[aqi] || levels[1];
+  }
 
-const getAirQualityStyle = (aqi) => {
-  const levels = {
-    1: { color: "#22c55e", label: "Good" },
-    2: { color: "#a3e635", label: "Fair" },
-    3: { color: "#facc15", label: "Moderate" },
-    4: { color: "#fb923c", label: "Poor" },
-    5: { color: "#ef4444", label: "Very Poor" },
-  };
+  if (aqi <= 50) return { color: "#22c55e", label: "Good" };
+  if (aqi <= 100) return { color: "#facc15", label: "Moderate" };
+  if (aqi <= 150) return { color: "#fb923c", label: "Unhealthy for sensitive groups" };
+  if (aqi <= 200) return { color: "#ef4444", label: "Unhealthy" };
+  if (aqi <= 300) return { color: "#9333ea", label: "Very unhealthy" };
+  return { color: "#7f1d1d", label: "Hazardous" };
+};
 
-  return levels[aqi] || levels[1];
+const getViewportSamplePoints = (map) => {
+  const bounds = map.getBounds();
+  const center = bounds.getCenter();
+
+  return [
+    center,
+    bounds.getNorthWest(),
+    bounds.getNorthEast(),
+    bounds.getSouthWest(),
+    bounds.getSouthEast(),
+  ].map(({ lat, lng }) => ({ lat, lon: lng }));
+};
+
+const WeatherOverlay = () => {
+  const map = useMap();
+  const [samples, setSamples] = useState([]);
+
+  const loadSamples = useCallback(async () => {
+    try {
+      const response = await getMapWeatherSamples(getViewportSamplePoints(map));
+      setSamples(response.data.samples || []);
+    } catch {
+      setSamples([]);
+    }
+  }, [map]);
+
+  useEffect(() => {
+    loadSamples();
+    map.on("moveend", loadSamples);
+
+    return () => map.off("moveend", loadSamples);
+  }, [loadSamples, map]);
+
+  return samples.map((sample) => (
+    <CircleMarker
+      center={[sample.lat, sample.lon]}
+      key={`${sample.lat}-${sample.lon}`}
+      pathOptions={{ color: "#0284c7", fillColor: "#38bdf8", fillOpacity: 0.45, weight: 3 }}
+      radius={18}
+    >
+      <Popup>
+        <strong>{sample.condition || "Current weather"}</strong>
+        <br />
+        {sample.temperature == null ? "Temperature unavailable" : `${Math.round(sample.temperature)} C`}
+        {sample.feels_like != null && `, feels like ${Math.round(sample.feels_like)} C`}
+        {sample.humidity != null && <><br />Humidity: {sample.humidity}%</>}
+        {sample.wind_speed != null && <><br />Wind: {sample.wind_speed} m/s</>}
+      </Popup>
+    </CircleMarker>
+  ));
 };
 
 const PollutionOverlay = () => {
@@ -80,39 +137,12 @@ const PollutionOverlay = () => {
   const [samples, setSamples] = useState([]);
 
   const loadSamples = useCallback(async () => {
-    if (!OPENWEATHER_API_KEY) return;
-
-    const bounds = map.getBounds();
-    const center = bounds.getCenter();
-    const sampleCoordinates = [
-      center,
-      bounds.getNorthWest(),
-      bounds.getNorthEast(),
-      bounds.getSouthWest(),
-      bounds.getSouthEast(),
-    ];
-
-    const results = await Promise.all(
-      sampleCoordinates.map(async ({ lat, lng }) => {
-        try {
-          const response = await fetch(
-            `https://api.openweathermap.org/data/2.5/air_pollution?lat=${lat}&lon=${lng}&appid=${OPENWEATHER_API_KEY}`,
-          );
-          const payload = await response.json();
-          // OpenWeather's air-pollution endpoint returns readings in `list`.
-          // Keep `data` as a fallback for compatibility with older proxies.
-          const dataPoint = payload.list?.[0] || payload.data?.[0];
-
-          if (!response.ok || !dataPoint) return null;
-
-          return { lat, lng, aqi: dataPoint.main.aqi };
-        } catch {
-          return null;
-        }
-      }),
-    );
-
-    setSamples(results.filter(Boolean));
+    try {
+      const response = await getMapPollutionSamples(getViewportSamplePoints(map));
+      setSamples(response.data.samples || []);
+    } catch {
+      setSamples([]);
+    }
   }, [map]);
 
   useEffect(() => {
@@ -123,12 +153,12 @@ const PollutionOverlay = () => {
   }, [loadSamples, map]);
 
   return samples.map((sample) => {
-    const airQuality = getAirQualityStyle(sample.aqi);
+    const airQuality = getAirQualityStyle(sample.aqi, sample.aqi_standard);
 
     return (
       <CircleMarker
-        center={[sample.lat, sample.lng]}
-        key={`${sample.lat}-${sample.lng}`}
+        center={[sample.lat, sample.lon]}
+        key={`${sample.lat}-${sample.lon}`}
         pathOptions={{
           color: airQuality.color,
           fillColor: airQuality.color,
@@ -139,6 +169,7 @@ const PollutionOverlay = () => {
       >
         <Popup>
           Air quality: <strong>{airQuality.label}</strong>
+          {sample.aqi != null && <><br />AQI: {Math.round(sample.aqi)}</>}
         </Popup>
       </CircleMarker>
     );
@@ -668,21 +699,15 @@ const MapCanvas = ({
           )}
         </Pane>
       )}
-      {mapStyle === "weather" && OPENWEATHER_API_KEY && (
+      {mapStyle === "weather" && (
         <Pane name="weather-overlay" style={{ zIndex: 350 }}>
-          <TileLayer
-            url={`https://tile.openweathermap.org/map/temp_new/{z}/{x}/{y}.png?appid=${OPENWEATHER_API_KEY}`}
-            attribution="&copy; OpenWeather"
-            opacity={0.72}
-            maxZoom={19}
-          />
+          <WeatherOverlay />
         </Pane>
       )}
-      {mapStyle === "pollution" && OPENWEATHER_API_KEY && <PollutionOverlay />}
-      {(mapStyle === "weather" || mapStyle === "pollution") && !OPENWEATHER_API_KEY && (
-        <div className="map-api-notice">
-          Add <code>VITE_OPENWEATHER_API_KEY</code> to enable this map view.
-        </div>
+      {mapStyle === "pollution" && (
+        <Pane name="pollution-overlay" style={{ zIndex: 350 }}>
+          <PollutionOverlay />
+        </Pane>
       )}
 
       {startPosition &&
