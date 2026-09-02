@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, Response, jsonify, request
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from functools import lru_cache
@@ -32,6 +32,10 @@ ORS_PROFILES = {
 OVERPASS_API_URL = "https://overpass-api.de/api/interpreter"
 TOMTOM_FLOW_URL = "https://api.tomtom.com/traffic/services/4/flowSegmentData/absolute/10/json"
 OPENWEATHER_AIR_POLLUTION_URL = "https://api.openweathermap.org/data/2.5/air_pollution"
+OPENWEATHER_CURRENT_WEATHER_URL = "https://api.openweathermap.org/data/2.5/weather"
+OPENWEATHER_TILE_URL = "https://tile.openweathermap.org/map/{layer}/{z}/{x}/{y}.png"
+OPEN_METEO_WEATHER_URL = "https://api.open-meteo.com/v1/forecast"
+OPEN_METEO_AIR_QUALITY_URL = "https://air-quality-api.open-meteo.com/v1/air-quality"
 POI_RADIUS_METERS = 500
 ROUTE_SAMPLE_LIMIT = 5
 TRAFFIC_SAMPLE_INTERVAL_METERS = 1500
@@ -67,6 +71,37 @@ def get_openweather_api_key():
         or get_env_value("OPENWEATHER_API_KEY")
         or get_env_value("OPENWEATHER_MAP_API_KEY")
     )
+
+
+def has_air_quality_provider():
+    return True
+
+
+def get_map_sample_points(payload):
+    points = payload.get("points", []) if isinstance(payload, dict) else []
+
+    if not isinstance(points, list) or not points:
+        raise ValueError("At least one map point is required")
+    if len(points) > 9:
+        raise ValueError("A maximum of nine map points is allowed")
+
+    normalized_points = []
+    for point in points:
+        if not isinstance(point, dict):
+            raise ValueError("Each map point must contain latitude and longitude")
+
+        try:
+            lat = float(point["lat"])
+            lon = float(point["lon"])
+        except (KeyError, TypeError, ValueError) as error:
+            raise ValueError("Each map point must contain valid latitude and longitude") from error
+
+        if not -90 <= lat <= 90 or not -180 <= lon <= 180:
+            raise ValueError("Map point coordinates are out of range")
+
+        normalized_points.append((round_coordinate(lat), round_coordinate(lon)))
+
+    return list(dict.fromkeys(normalized_points))
 
 
 def get_traffic_api_key():
@@ -517,28 +552,206 @@ def score_route_for_traffic(route, mode):
 
 @lru_cache(maxsize=256)
 def fetch_air_pollution_snapshot(lat, lon):
-    openweather_api_key = get_openweather_api_key()
 
-    if not openweather_api_key:
-        return None
+    if openweather_api_key:
+        try:
+            response = requests.get(
+                OPENWEATHER_AIR_POLLUTION_URL,
+                params={
+                    "lat": lat,
+                    "lon": lon,
+                    "appid": openweather_api_key,
+                },
+                timeout=EXTERNAL_API_TIMEOUT,
+            )
+            response.raise_for_status()
+            entries = response.json().get("list", [])
+            if entries:
+                return {"source": "openweather", **entries[0]}
+        except requests.RequestException:
+            pass
 
     response = requests.get(
-        OPENWEATHER_AIR_POLLUTION_URL,
+        OPEN_METEO_AIR_QUALITY_URL,
         params={
-            "lat": lat,
-            "lon": lon,
-            "appid": openweather_api_key,
+            "latitude": lat,
+            "longitude": lon,
+            "current": "us_aqi,pm2_5,pm10,carbon_monoxide,nitrogen_dioxide,ozone,sulphur_dioxide",
         },
         timeout=EXTERNAL_API_TIMEOUT,
     )
     response.raise_for_status()
+    current = response.json().get("current", {})
+    us_aqi = current.get("us_aqi")
+    if us_aqi is None:
+        return None
 
-    entries = response.json().get("list", [])
-    return entries[0] if entries else None
+    return {
+        "source": "open_meteo",
+        "main": {"aqi": us_aqi},
+        "components": {
+            "pm2_5": current.get("pm2_5"),
+            "pm10": current.get("pm10"),
+            "co": current.get("carbon_monoxide"),
+            "no2": current.get("nitrogen_dioxide"),
+            "o3": current.get("ozone"),
+            "so2": current.get("sulphur_dioxide"),
+        },
+    }
+
+
+@lru_cache(maxsize=256)
+def fetch_weather_snapshot(lat, lon):
+    openweather_api_key = get_openweather_api_key()
+
+    if openweather_api_key:
+        try:
+            response = requests.get(
+                OPENWEATHER_CURRENT_WEATHER_URL,
+                params={
+                    "lat": lat,
+                    "lon": lon,
+                    "appid": openweather_api_key,
+                    "units": "metric",
+                },
+                timeout=EXTERNAL_API_TIMEOUT,
+            )
+            response.raise_for_status()
+            return {"source": "openweather", **response.json()}
+        except requests.RequestException:
+            pass
+
+    response = requests.get(
+        OPEN_METEO_WEATHER_URL,
+        params={
+            "latitude": lat,
+            "longitude": lon,
+            "current": "temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weather_code",
+            "wind_speed_unit": "ms",
+        },
+        timeout=EXTERNAL_API_TIMEOUT,
+    )
+    response.raise_for_status()
+    current = response.json().get("current", {})
+    if current.get("temperature_2m") is None:
+        return None
+
+    weather_code = current.get("weather_code")
+    weather_labels = {
+        0: "Clear sky", 1: "Mainly clear", 2: "Partly cloudy", 3: "Overcast",
+        45: "Fog", 48: "Rime fog", 51: "Light drizzle", 53: "Drizzle",
+        55: "Heavy drizzle", 61: "Light rain", 63: "Rain", 65: "Heavy rain",
+        71: "Light snow", 73: "Snow", 75: "Heavy snow", 80: "Rain showers",
+        81: "Rain showers", 82: "Heavy rain showers", 95: "Thunderstorm",
+        96: "Thunderstorm with hail", 99: "Thunderstorm with hail",
+    }
+    return {
+        "source": "open_meteo",
+        "main": {
+            "temp": current.get("temperature_2m"),
+            "feels_like": current.get("apparent_temperature"),
+            "humidity": current.get("relative_humidity_2m"),
+        },
+        "wind": {"speed": current.get("wind_speed_10m")},
+        "weather": [{"description": weather_labels.get(weather_code, "Current conditions")}],
+    }
+
+
+def fetch_map_samples(points, fetch_snapshot, transform):
+    def fetch_point(point):
+        lat, lon = point
+        try:
+            snapshot = fetch_snapshot(lat, lon)
+        except requests.RequestException:
+            return None
+
+        return transform(lat, lon, snapshot) if snapshot else None
+
+    with ThreadPoolExecutor(max_workers=min(SCORING_WORKERS, len(points))) as executor:
+        return [sample for sample in executor.map(fetch_point, points) if sample]
+
+
+@lru_cache(maxsize=128)
+def fetch_openweather_tile(layer, z, x, y):
+    response = requests.get(
+        OPENWEATHER_TILE_URL.format(layer=layer, z=z, x=x, y=y),
+        params={"appid": get_openweather_api_key()},
+        timeout=EXTERNAL_API_TIMEOUT,
+    )
+    response.raise_for_status()
+    return response.content, response.headers.get("Content-Type", "image/png")
+
+
+@api.route("/map/tiles/<layer>/<int:z>/<int:x>/<int:y>.png", methods=["GET"])
+def get_map_tile(layer, z, x, y):
+    allowed_layers = {"temp_new", "usepa_aqi"}
+    if layer not in allowed_layers:
+        return jsonify({"error": "Unsupported map layer"}), 404
+    if not get_openweather_api_key():
+        return jsonify({"error": "WEATHER_API_KEY is missing or empty in backend/.env"}), 503
+    if not 0 <= z <= 19 or not 0 <= x < 2**z or not 0 <= y < 2**z:
+        return jsonify({"error": "Invalid map tile coordinates"}), 400
+
+    try:
+        content, content_type = fetch_openweather_tile(layer, z, x, y)
+    except requests.RequestException as error:
+        status_code = error.response.status_code if error.response is not None else 502
+        return jsonify({"error": "Unable to fetch OpenWeather map tile"}), status_code
+
+    return Response(
+        content,
+        content_type=content_type,
+        headers={"Cache-Control": "public, max-age=1800"},
+    )
+
+
+@api.route("/map/weather", methods=["POST"])
+def get_map_weather():
+    try:
+        points = get_map_sample_points(request.get_json(silent=True) or {})
+    except ValueError as error:
+        return jsonify({"error": str(error)}), 400
+
+    samples = fetch_map_samples(
+        points,
+        fetch_weather_snapshot,
+        lambda lat, lon, weather: {
+            "lat": lat,
+            "lon": lon,
+            "temperature": weather.get("main", {}).get("temp"),
+            "feels_like": weather.get("main", {}).get("feels_like"),
+            "humidity": weather.get("main", {}).get("humidity"),
+            "wind_speed": weather.get("wind", {}).get("speed"),
+            "condition": (weather.get("weather") or [{}])[0].get("description"),
+            "icon": (weather.get("weather") or [{}])[0].get("icon"),
+        },
+    )
+    return jsonify({"samples": samples})
+
+
+@api.route("/map/pollution", methods=["POST"])
+def get_map_pollution():
+    try:
+        points = get_map_sample_points(request.get_json(silent=True) or {})
+    except ValueError as error:
+        return jsonify({"error": str(error)}), 400
+
+    samples = fetch_map_samples(
+        points,
+        fetch_air_pollution_snapshot,
+        lambda lat, lon, pollution: {
+            "lat": lat,
+            "lon": lon,
+            "aqi": pollution.get("main", {}).get("aqi"),
+            "aqi_standard": "us_aqi" if pollution.get("source") == "open_meteo" else "openweather",
+            "components": pollution.get("components", {}),
+        },
+    )
+    return jsonify({"samples": samples})
 
 
 def get_route_pollution_score(route, mode):
-    if not get_openweather_api_key():
+    if not has_air_quality_provider():
         return None, 0, None
 
     sampled_points = get_route_sample_points(route)
@@ -563,7 +776,10 @@ def get_route_pollution_score(route, mode):
         if not pollution:
             return None
 
-        return pollution.get("main", {}).get("aqi")
+        aqi = pollution.get("main", {}).get("aqi")
+        if pollution.get("source") == "open_meteo" and aqi is not None:
+            return min(5, max(1, math.ceil(float(aqi) / 50)))
+        return aqi
 
     with ThreadPoolExecutor(max_workers=min(SCORING_WORKERS, len(sampled_points))) as executor:
         pollution_samples = executor.map(fetch_sample, sampled_points)
@@ -636,7 +852,7 @@ def get_low_pollution_route():
     if not profile:
         return jsonify({"error": "Unsupported travel mode"}), 400
 
-    can_score_pollution = bool(openweather_api_key)
+    can_score_pollution = has_air_quality_provider()
     request_body = build_route_request_body(
         coordinates,
         include_alternatives=True,
@@ -877,7 +1093,7 @@ def get_route():
     avoid_pollution = bool(filters.get("pollution", False))
     ors_api_key = get_env_value("ORS_API_KEY")
     can_score_traffic = bool(get_traffic_api_key())
-    can_score_pollution = bool(get_openweather_api_key())
+    can_score_pollution = has_air_quality_provider()
 
     if not ors_api_key:
         return jsonify({"error": "ORS_API_KEY is missing or empty in backend/.env"}), 500

@@ -55,6 +55,7 @@ function ProtectedRoute({ children }) {
 function AppContent() {
   const location = useLocation();
   const [theme, setTheme] = useState(getInitialTheme);
+  const isHome = location.pathname === "/";
   const isDashboard = location.pathname === "/dashboard";
 
   useEffect(() => {
@@ -68,30 +69,32 @@ function AppContent() {
 
   return (
     <>
-      <button
-        className={`theme-toggle-btn ${isDashboard ? "dashboard-theme-toggle" : ""}`}
-        onClick={toggleTheme}
-        type="button"
-        aria-label={`Switch to ${theme === "dark" ? "bright" : "dark"} theme`}
-        title={`Switch to ${theme === "dark" ? "bright" : "dark"} theme`}
-      >
-        {theme === "dark" ? <FaSun /> : <FaMoon />}
-        <span className="theme-toggle-label">
-          {theme === "dark" ? "Bright" : "Dark"}
-        </span>
-      </button>
+      {!isHome && !isDashboard && (
+        <button
+          className={`theme-toggle-btn ${isDashboard ? "dashboard-theme-toggle" : ""}`}
+          onClick={toggleTheme}
+          type="button"
+          aria-label={`Switch to ${theme === "dark" ? "bright" : "dark"} theme`}
+          title={`Switch to ${theme === "dark" ? "bright" : "dark"} theme`}
+        >
+          {theme === "dark" ? <FaSun /> : <FaMoon />}
+          <span className="theme-toggle-label">
+            {theme === "dark" ? "bright" : "dark"}
+          </span>
+        </button>
+      )}
       <Routes>
-        <Route path="/" element={<Home theme={theme} />} />
+        <Route path="/" element={<Home onToggleTheme={toggleTheme} theme={theme} />} />
         <Route
           path="/dashboard"
           element={
             <ProtectedRoute>
-              <Dashboard theme={theme} />
+              <Dashboard theme={theme} onToggleTheme={toggleTheme} />
             </ProtectedRoute>
           }
         />
-        <Route path="/signin" element={<SignIn />} />
-        <Route path="/register" element={<Register />} />
+        <Route path="/signin" element={<SignIn theme={theme} />} />
+        <Route path="/register" element={<Register theme={theme} />} />
 
         {/* ✅ NEW ROUTE */}
         <Route path="/otp" element={<OtpPage />} />

@@ -25,18 +25,18 @@ body {
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --theme-bg: #050816;
-  --theme-surface: #09101d;
-  --theme-surface-alt: #07111d;
-  --theme-card: #0f1b2d;
-  --theme-border: rgba(255, 255, 255, 0.1);
-  --theme-text: #d8e3ef;
-  --theme-heading: #f5fff8;
-  --theme-muted: #9aa8bc;
-  --theme-accent: #00e676;
-  --theme-accent-strong: #00b96b;
-  --theme-accent-soft: rgba(0, 230, 118, 0.12);
-  --theme-shadow: 0 16px 45px rgba(0, 0, 0, 0.34);
+  --theme-bg: #0b1220;
+  --theme-surface: #111c2d;
+  --theme-surface-alt: #15233a;
+  --theme-card: #1c2c45;
+  --theme-border: #3d506a;
+  --theme-text: #edf3fb;
+  --theme-heading: #ffffff;
+  --theme-muted: #c3cfdf;
+  --theme-accent: #4ade80;
+  --theme-accent-strong: #22c55e;
+  --theme-accent-soft: rgba(74, 222, 128, 0.18);
+  --theme-shadow: 0 16px 45px rgba(0, 0, 0, 0.42);
 }
 
 .brand-logo-img {
@@ -193,7 +193,7 @@ html[data-theme="bright"] .home-page .section-subtitle {
 html[data-theme="dark"] {
   --map-panel-bg: var(--theme-surface);
   --map-panel-muted: var(--theme-card);
-  --map-panel-soft: #1b3026;
+  --map-panel-soft: var(--theme-surface-alt);
   --map-panel-border: var(--theme-border);
   --map-text: var(--theme-text);
   --map-text-muted: var(--theme-muted);

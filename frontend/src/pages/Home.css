@@ -78,7 +78,8 @@ body {
     opacity: 0.95;
 }
 
-.nav-links a {
+.nav-links a,
+.nav-theme-toggle {
     position: relative;
     color: white;
     text-decoration: none;
@@ -86,7 +87,16 @@ body {
     transition: color 250ms ease;
 }
 
-.nav-links a::after {
+.nav-theme-toggle {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    font: inherit;
+}
+
+.nav-links a::after,
+.nav-theme-toggle::after {
     content: "";
     position: absolute;
     left: 0;
@@ -98,11 +108,13 @@ body {
 }
 
 .nav-links a:hover,
+.nav-theme-toggle:hover,
 .nav-link.active {
     color: #00e676;
 }
 
 .nav-links a:hover::after,
+.nav-theme-toggle:hover::after,
 .nav-link.active::after {
     width: 100%;
 }
@@ -951,16 +963,9 @@ html[data-theme="bright"] .hero-section {
   background: #effaf2;
 }
 
-html[data-theme="bright"] .overlay {
-  background:
-    linear-gradient(
-      90deg,
-      rgba(247, 255, 249, 0.94) 0%,
-      rgba(247, 255, 249, 0.78) 38%,
-      rgba(247, 255, 249, 0.34) 70%,
-      rgba(247, 255, 249, 0.08) 100%
-    ),
-    linear-gradient(180deg, rgba(247, 255, 249, 0.15), rgba(247, 255, 249, 0.72));
+html[data-theme="bright"] .banner-slideshow::before,
+html[data-theme="bright"] .banner-slide {
+  filter: saturate(1.14) contrast(1.08) brightness(1.02);
 }
 
 html[data-theme="bright"] .navbar {
@@ -974,7 +979,7 @@ html[data-theme="bright"] .navbar.scrolled {
 }
 
 html[data-theme="bright"] .nav-links a,
-html[data-theme="bright"] .hero-content,
+html[data-theme="bright"] .nav-theme-toggle,
 html[data-theme="bright"] .section-heading h2,
 html[data-theme="bright"] .about-card h3,
 html[data-theme="bright"] .contact-card h3,
@@ -1010,6 +1015,69 @@ html[data-theme="bright"] .contact-details-list a {
   color: #52665a;
 }
 
+html[data-theme="bright"] .hero-content .description {
+  color: #ffffff;
+  opacity: 1;
+}
+
+html[data-theme="bright"] .home-page .section-eyebrow {
+  color: #00e676;
+}
+
+html[data-theme="bright"] .about-section .values-list svg {
+  color: #00e676;
+}
+
+html[data-theme="bright"] .about-card .values-list li {
+  color: #10241b;
+}
+
+html[data-theme="bright"] .bullet-list div,
+html[data-theme="bright"] .vision-list div,
+html[data-theme="bright"] .contact-details-list li {
+  color: #10241b;
+}
+
+html[data-theme="bright"] .contact-form input,
+html[data-theme="bright"] .contact-form textarea {
+  background: #fff;
+  border-color: #000;
+  color: #10241b;
+}
+
+html[data-theme="bright"] .contact-form input:focus,
+html[data-theme="bright"] .contact-form textarea:focus {
+  border-color: #27ae60;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(39, 174, 96, 0.16);
+}
+
+html[data-theme="bright"] .contact-form input::placeholder,
+html[data-theme="bright"] .contact-form textarea::placeholder {
+  color: #5d6d63;
+  opacity: 1;
+}
+
+html[data-theme="bright"] .contact-actions .hero-btn {
+  background: #27ae60;
+  color: #fff;
+}
+
+html[data-theme="bright"] .contact-actions .hero-btn:hover {
+  background: #1f8c4d;
+}
+
+html[data-theme="bright"] .contact-actions .ghost-btn {
+  border-color: #27ae60;
+  background: #fff;
+  color: #1f6f40;
+}
+
+html[data-theme="bright"] .contact-actions .ghost-btn:hover {
+  background: #eaf8ef;
+  color: #175c34;
+}
+
 html[data-theme="bright"] .about-card,
 html[data-theme="bright"] .contact-card,
 html[data-theme="bright"] .features-shell,
@@ -1031,19 +1099,160 @@ html[data-theme="bright"] .cta-banner {
   border-color: rgba(39, 174, 96, 0.2);
 }
 
-html[data-theme="bright"] .hero-btn {
-  background: #10241b;
+html[data-theme="bright"] .cta-actions .hero-btn {
+  background: #1f8c4d;
+  color: #fff;
+}
+
+html[data-theme="bright"] .cta-actions .hero-btn:hover {
+  background: #176b3b;
+}
+
+html[data-theme="bright"] .cta-actions .ghost-btn {
+  border-color: #1f8c4d;
+  background: rgba(255, 255, 255, 0.8);
+  color: #175c34;
+}
+
+html[data-theme="bright"] .cta-actions .ghost-btn:hover {
+  background: #e3f6ea;
+  color: #102f1d;
+}
+
+html[data-theme="bright"] .vision-illustration {
+  background:
+    radial-gradient(circle at top left, rgba(46, 204, 113, 0.3), transparent 36%),
+    linear-gradient(135deg, #f8fffa, #e6f7ec);
+  border-color: rgba(39, 174, 96, 0.2);
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.08);
+}
+
+html[data-theme="bright"] .vision-orb {
+  border-color: rgba(39, 174, 96, 0.45);
+  box-shadow: inset 0 0 60px rgba(46, 204, 113, 0.16);
+}
+
+html[data-theme="bright"] .vision-grid {
+  background-image:
+    linear-gradient(rgba(16, 36, 27, 0.12) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(16, 36, 27, 0.12) 1px, transparent 1px);
+}
+
+html[data-theme="bright"] .vision-card {
+  background: rgba(255, 255, 255, 0.86);
+  border-color: rgba(39, 174, 96, 0.2);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.1);
+}
+
+html[data-theme="bright"] .workflow-horizontal {
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid rgba(39, 174, 96, 0.18);
+  border-radius: 28px;
+  background: linear-gradient(135deg, #ffffff, #eaf8ee);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+}
+
+html[data-theme="bright"] .workflow-item {
+  flex: 1 1 180px;
+  justify-content: center;
+  padding: 14px 16px;
+  border: 1px solid rgba(39, 174, 96, 0.22);
+  border-radius: 18px;
+  background: linear-gradient(135deg, #f8fffa, #e1f6e8);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
+  color: #10241b;
+}
+
+html[data-theme="bright"] .workflow-icon {
+  width: 38px;
+  height: 38px;
+  margin-bottom: 0;
+  border-radius: 12px;
+  background: #00b96b;
   color: #ffffff;
+}
+
+html[data-theme="bright"] .workflow-arrow {
+  color: #16894c;
 }
 
 html[data-theme="dark"] .home-page,
 html[data-theme="dark"] .home-sections {
   background:
-    radial-gradient(circle at 18% 8%, rgba(0, 230, 118, 0.12), transparent 26%),
-    linear-gradient(180deg, #050816 0%, #07111d 54%, #04110d 100%);
+    radial-gradient(circle at 18% 8%, rgba(74, 222, 128, 0.14), transparent 26%),
+    linear-gradient(180deg, var(--theme-bg) 0%, var(--theme-surface-alt) 54%, #102a22 100%);
 }
 
 html[data-theme="dark"] .navbar.scrolled {
-  background: rgba(3, 8, 18, 0.68);
+  background: rgba(11, 18, 32, 0.86);
+}
+
+html[data-theme="dark"] .section-heading h2,
+html[data-theme="dark"] .about-card h3,
+html[data-theme="dark"] .contact-card h3,
+html[data-theme="dark"] .why-copy-card h3,
+html[data-theme="dark"] .mini-card h4,
+html[data-theme="dark"] .feature-card h4,
+html[data-theme="dark"] .timeline-card h4,
+html[data-theme="dark"] .testimonial-card h4,
+html[data-theme="dark"] .faq-item summary,
+html[data-theme="dark"] .stat-label,
+html[data-theme="dark"] .tech-card,
+html[data-theme="dark"] .workflow-item,
+html[data-theme="dark"] .vision-card {
+  color: var(--theme-heading);
+}
+
+html[data-theme="dark"] .description,
+html[data-theme="dark"] .section-description,
+html[data-theme="dark"] .about-story p,
+html[data-theme="dark"] .about-card p,
+html[data-theme="dark"] .contact-card p,
+html[data-theme="dark"] .why-copy-card p,
+html[data-theme="dark"] .mini-card p,
+html[data-theme="dark"] .feature-card p,
+html[data-theme="dark"] .timeline-card p,
+html[data-theme="dark"] .testimonial-review,
+html[data-theme="dark"] .home-footer,
+html[data-theme="dark"] .home-footer a,
+html[data-theme="dark"] .cta-banner p,
+html[data-theme="dark"] .stat-detail,
+html[data-theme="dark"] .faq-item p,
+html[data-theme="dark"] .contact-details-list a {
+  color: var(--theme-muted);
+}
+
+html[data-theme="dark"] .about-card,
+html[data-theme="dark"] .contact-card,
+html[data-theme="dark"] .features-shell,
+html[data-theme="dark"] .why-copy-card,
+html[data-theme="dark"] .mini-card,
+html[data-theme="dark"] .feature-card,
+html[data-theme="dark"] .tech-card,
+html[data-theme="dark"] .testimonial-card,
+html[data-theme="dark"] .faq-item,
+html[data-theme="dark"] .stat-card,
+html[data-theme="dark"] .timeline-card {
+  background: rgba(17, 28, 45, 0.94);
+  border-color: var(--theme-border);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.32);
+}
+
+html[data-theme="dark"] .section-eyebrow,
+html[data-theme="dark"] .contact-details-list a:hover {
+  color: var(--theme-accent);
+}
+
+html[data-theme="dark"] .cta-banner {
+  background: linear-gradient(135deg, rgba(74, 222, 128, 0.22), rgba(96, 165, 250, 0.18));
+  border-color: #4ade80;
+}
+
+html[data-theme="dark"] .contact-form input,
+html[data-theme="dark"] .contact-form textarea {
+  background: var(--theme-card);
+  border-color: var(--theme-border);
+  color: var(--theme-text);
 }
 

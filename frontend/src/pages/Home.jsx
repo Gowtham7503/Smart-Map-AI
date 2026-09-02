@@ -20,7 +20,7 @@ const bannerImages = [
   bannerImage6,
 ];
 
-const Home = ({ theme = "bright" }) => {
+const Home = ({ onToggleTheme, theme = "bright" }) => {
   const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState("home");
   const [scrolled, setScrolled] = useState(false);
@@ -67,11 +67,21 @@ const Home = ({ theme = "bright" }) => {
       <header className={`navbar${scrolled ? " scrolled" : ""}`}>
         <img
           className="brand-logo-img home-logo"
-          src={theme === "dark" ? smartMapsLogo : smartMapsLogoDark}
+          src={theme === "bright" && scrolled ? smartMapsLogoDark : smartMapsLogo}
           alt="SmartMaps"
         />
 
         <ul className="nav-links">
+          <li>
+            <button
+              className="nav-link nav-theme-toggle"
+              onClick={onToggleTheme}
+              type="button"
+              aria-label={`Switch to ${theme === "dark" ? "bright" : "dark"} theme`}
+            >
+              {theme === "dark" ? "bright" : "dark"}
+            </button>
+          </li>
           <li>
             <a href="#about" className={activeSection === "about" ? "nav-link active" : "nav-link"}>
               About us

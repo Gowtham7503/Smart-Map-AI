@@ -13,6 +13,14 @@ export const getLowPollutionRoute = (coordinates, mode = "car", filters = {}) =>
   return API.post("/route/pollution", { coordinates, mode, filters });
 };
 
+export const getMapWeatherSamples = (points) => {
+  return API.post("/map/weather", { points });
+};
+
+export const getMapPollutionSamples = (points) => {
+  return API.post("/map/pollution", { points });
+};
+
 export const getChatbotRecommendations = (
   message,
   position,
