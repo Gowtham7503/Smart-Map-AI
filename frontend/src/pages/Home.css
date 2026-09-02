@@ -1038,6 +1038,46 @@ html[data-theme="bright"] .contact-details-list li {
   color: #10241b;
 }
 
+html[data-theme="bright"] .contact-form input,
+html[data-theme="bright"] .contact-form textarea {
+  background: #fff;
+  border-color: #000;
+  color: #10241b;
+}
+
+html[data-theme="bright"] .contact-form input:focus,
+html[data-theme="bright"] .contact-form textarea:focus {
+  border-color: #27ae60;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(39, 174, 96, 0.16);
+}
+
+html[data-theme="bright"] .contact-form input::placeholder,
+html[data-theme="bright"] .contact-form textarea::placeholder {
+  color: #5d6d63;
+  opacity: 1;
+}
+
+html[data-theme="bright"] .contact-actions .hero-btn {
+  background: #27ae60;
+  color: #fff;
+}
+
+html[data-theme="bright"] .contact-actions .hero-btn:hover {
+  background: #1f8c4d;
+}
+
+html[data-theme="bright"] .contact-actions .ghost-btn {
+  border-color: #27ae60;
+  background: #fff;
+  color: #1f6f40;
+}
+
+html[data-theme="bright"] .contact-actions .ghost-btn:hover {
+  background: #eaf8ef;
+  color: #175c34;
+}
+
 html[data-theme="bright"] .about-card,
 html[data-theme="bright"] .contact-card,
 html[data-theme="bright"] .features-shell,
@@ -1057,6 +1097,26 @@ html[data-theme="bright"] .timeline-card {
 html[data-theme="bright"] .cta-banner {
   background: linear-gradient(135deg, rgba(46, 204, 113, 0.18), rgba(14, 165, 233, 0.1));
   border-color: rgba(39, 174, 96, 0.2);
+}
+
+html[data-theme="bright"] .cta-actions .hero-btn {
+  background: #1f8c4d;
+  color: #fff;
+}
+
+html[data-theme="bright"] .cta-actions .hero-btn:hover {
+  background: #176b3b;
+}
+
+html[data-theme="bright"] .cta-actions .ghost-btn {
+  border-color: #1f8c4d;
+  background: rgba(255, 255, 255, 0.8);
+  color: #175c34;
+}
+
+html[data-theme="bright"] .cta-actions .ghost-btn:hover {
+  background: #e3f6ea;
+  color: #102f1d;
 }
 
 html[data-theme="bright"] .vision-illustration {

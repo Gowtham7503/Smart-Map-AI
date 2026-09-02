@@ -262,7 +262,7 @@ const getSavedSearch = () => {
   }
 };
 
-const MapView = ({ theme = "bright" }) => {
+const MapView = ({ theme = "bright", onToggleTheme }) => {
   const savedSearch = getSavedSearch();
   const isFirstSafetyEffect = useRef(true);
   const routeRequestIdRef = useRef(0);
@@ -1062,6 +1062,7 @@ const MapView = ({ theme = "bright" }) => {
           onExitNavigation={stopNavigation}
           onOpenChatbot={() => setShowChatbot(true)}
           onRouteOptionSelect={handleRouteOptionSelect}
+          onToggleTheme={onToggleTheme}
           navigationActive={navigationActive}
           navigationHeading={navigationHeading}
           navigationMode={mode}

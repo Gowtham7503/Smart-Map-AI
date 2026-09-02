@@ -12,6 +12,7 @@ import {
   useMap,
 } from "react-leaflet";
 import L from "leaflet";
+import { FaMoon, FaSun } from "react-icons/fa";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
@@ -29,15 +30,9 @@ L.Icon.Default.mergeOptions({
 const MAP_STYLES = {
   default: {
     label: "Default",
-    url: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
-    darkUrl: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-    attribution: "&copy; OpenStreetMap &copy; CARTO",
-    maxZoom: 20,
-  },
-  satellite: {
-    label: "Satellite",
-    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-    attribution: "Tiles &copy; Esri",
+    url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    darkUrl: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    attribution: "&copy; OpenStreetMap contributors",
     maxZoom: 19,
   },
   terrain: {
@@ -58,10 +53,6 @@ const MAP_STYLES = {
   },
 };
 
-const TRANSPORTATION_REFERENCE_URL =
-  "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}";
-const PLACE_LABEL_REFERENCE_URL =
-  "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}";
 const getAirQualityStyle = (aqi, standard) => {
   if (standard === "openweather") {
     const levels = {
@@ -191,8 +182,10 @@ const MapControls = ({
   hasSelectedPlace,
   onCloseSelectedPlace,
   onOpenChatbot,
+  onToggleTheme,
   mapStyle,
   onMapStyleChange,
+  theme,
 }) => {
   const map = useMap();
   const [isMapStyleMenuOpen, setIsMapStyleMenuOpen] = useState(false);
@@ -209,6 +202,15 @@ const MapControls = ({
   return (
     <>
       <div className="map-controls">
+        <button
+          className="map-btn theme-map-btn"
+          onClick={onToggleTheme}
+          type="button"
+          aria-label={`Switch to ${theme === "dark" ? "bright" : "dark"} theme`}
+          title={`Switch to ${theme === "dark" ? "bright" : "dark"} theme`}
+        >
+          {theme === "dark" ? <FaSun /> : <FaMoon />}
+        </button>
         <button
           className="map-btn chatbot-btn"
           onClick={onOpenChatbot}
@@ -580,6 +582,7 @@ const MapCanvas = ({
   onExitNavigation,
   onOpenChatbot,
   onRouteOptionSelect,
+  onToggleTheme,
   panelHeight,
   routeCoords,
   selectedRouteOption = "preferred",
@@ -662,8 +665,10 @@ const MapCanvas = ({
         hasSelectedPlace={hasSelectedPlace}
         onCloseSelectedPlace={onCloseSelectedPlace}
         onOpenChatbot={onOpenChatbot}
+        onToggleTheme={onToggleTheme}
         mapStyle={mapStyle}
         onMapStyleChange={setMapStyle}
+        theme={theme}
       />
       <MapViewportController
         focusActive={mapFocusActive}
@@ -681,24 +686,6 @@ const MapCanvas = ({
         attribution={baseMapStyle.attribution}
         maxZoom={baseMapStyle.maxZoom}
       />
-      {isDarkTheme && (baseMapStyleKey === "default" || baseMapStyleKey === "satellite") && (
-        <Pane name="dark-map-reference" style={{ zIndex: 250 }}>
-          <TileLayer
-            url={TRANSPORTATION_REFERENCE_URL}
-            attribution="&copy; Esri"
-            opacity={1}
-            maxZoom={19}
-          />
-          {baseMapStyleKey === "default" && (
-            <TileLayer
-              url={PLACE_LABEL_REFERENCE_URL}
-              attribution="&copy; Esri"
-              opacity={1}
-              maxZoom={19}
-            />
-          )}
-        </Pane>
-      )}
       {mapStyle === "weather" && (
         <Pane name="weather-overlay" style={{ zIndex: 350 }}>
           <WeatherOverlay />

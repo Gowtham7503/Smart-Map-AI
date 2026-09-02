@@ -69,7 +69,7 @@ function AppContent() {
 
   return (
     <>
-      {!isHome && (
+      {!isHome && !isDashboard && (
         <button
           className={`theme-toggle-btn ${isDashboard ? "dashboard-theme-toggle" : ""}`}
           onClick={toggleTheme}
@@ -89,7 +89,7 @@ function AppContent() {
           path="/dashboard"
           element={
             <ProtectedRoute>
-              <Dashboard theme={theme} />
+              <Dashboard theme={theme} onToggleTheme={toggleTheme} />
             </ProtectedRoute>
           }
         />

@@ -619,8 +619,8 @@ html[data-theme="dark"] .illustration-wrapper {
 }
 
 html[data-theme="dark"] .illustration-image {
-  filter: invert(0.9) hue-rotate(155deg) saturate(0.78) brightness(0.86) contrast(1.08);
-  opacity: 0.88;
+  filter: none;
+  opacity: 0.95;
 }
 
 html[data-theme="dark"] .right-section h1,
