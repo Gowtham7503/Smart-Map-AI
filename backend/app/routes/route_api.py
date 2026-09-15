@@ -553,6 +553,8 @@ def score_route_for_traffic(route, mode):
 @lru_cache(maxsize=256)
 def fetch_air_pollution_snapshot(lat, lon):
 
+    openweather_api_key = get_openweather_api_key()
+
     if openweather_api_key:
         try:
             response = requests.get(
