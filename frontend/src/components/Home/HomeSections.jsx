@@ -383,11 +383,10 @@ export const HomeSections = () => {
           <AnimatedSection animation="fade-right" delay={120}>
             <div className="contact-card">
               <ul className="contact-details-list">
-                <li><FaEnvelope /> <a href="mailto:hello@smartmaps.ai">hello@smartmaps.ai</a></li>
-                <li><FaPhone /> <a href="tel:+1234567890">+1 (234) 567-890</a></li>
-                <li><FaMapMarkerAlt /> <span>123 Urban Avenue, Smart City, CA</span></li>
-                <li><FaGithub /> <a href="https://github.com" target="_blank" rel="noreferrer">GitHub</a></li>
-                <li><FaLinkedin /> <a href="https://linkedin.com" target="_blank" rel="noreferrer">LinkedIn</a></li>
+                <li><FaEnvelope /> <a href="mailto:smartmaps0423@gmail.com">smartmaps0423@gmail.com</a></li>
+                <li><FaPhone /> <a href="tel:+919848671767">+91 9848671767</a></li>
+                <li><FaMapMarkerAlt /> <span>VLITS, Vadlamudi, Guntur</span></li>
+                <li><FaGithub /> <a href="https://github.comhttps://github.com/Gowtham7503/Smart-Map-AI" target="_blank" rel="noreferrer">GitHub</a></li>
               </ul>
               <div className="map-placeholder">
                 <FaMap />

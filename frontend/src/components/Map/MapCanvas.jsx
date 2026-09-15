@@ -29,12 +29,11 @@ L.Icon.Default.mergeOptions({
 
 const MAP_STYLES = {
   default: {
-    label: "Default",
-    url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-    darkUrl: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-    attribution: "&copy; OpenStreetMap contributors",
-    maxZoom: 19,
-  },
+  label: "Default",
+  url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+  attribution: "&copy; OpenStreetMap contributors",
+  maxZoom: 19,
+},
   terrain: {
     label: "Terrain",
     url: "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
@@ -605,9 +604,8 @@ const MapCanvas = ({
   const baseMapStyleKey = activeMapStyle.baseStyle || mapStyle;
   const baseMapStyle = MAP_STYLES[baseMapStyleKey];
   const isDarkTheme = theme === "dark";
-  const tileLayerUrl = isDarkTheme && baseMapStyle.darkUrl
-    ? baseMapStyle.darkUrl
-    : baseMapStyle.url;
+  const tileLayerUrl = baseMapStyle.url;
+  const tileAttribution = baseMapStyle.attribution;
   const routeColors = isDarkTheme
     ? { preferred: "#4ade80", secondary: "#60a5fa", outline: "#93c5fd" }
     : { preferred: "#2ecc71", secondary: "#16a34a", outline: "#0b57d0" };
@@ -683,7 +681,7 @@ const MapCanvas = ({
       <TileLayer
         key={`${baseMapStyleKey}-${isDarkTheme ? "dark" : "bright"}`}
         url={tileLayerUrl}
-        attribution={baseMapStyle.attribution}
+        attribution={tileAttribution}
         maxZoom={baseMapStyle.maxZoom}
       />
       {mapStyle === "weather" && (
