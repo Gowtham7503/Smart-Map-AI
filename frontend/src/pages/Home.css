@@ -1,4 +1,4 @@
-﻿* {
+* {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
@@ -43,11 +43,11 @@ body {
 }
 
 .navbar.scrolled {
-    background: rgba(3, 8, 18, 0.58);
+    background: rgba(3, 8, 18, 0.72);
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
     border-bottom-color: rgba(255,255,255,0.08);
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.24);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
 }
 
 .logo {
@@ -119,87 +119,74 @@ body {
     width: 100%;
 }
 
+/* ================= HERO SECTION ================= */
 .hero-section {
     position: relative;
     min-height: 100vh;
     width: 100%;
     overflow: hidden;
-    background: #0c1412;
+    background: #060b14;
     display: flex;
     align-items: stretch;
 }
 
-.banner-slideshow,
-.banner-slide,
+.banner-slideshow {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.banner-slide-item {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    visibility: hidden;
+    transform: scale(1.08);
+    transition: opacity 1.4s cubic-bezier(0.4, 0, 0.2, 1), transform 7s cubic-bezier(0.25, 1, 0.5, 1), visibility 1.4s;
+    will-change: opacity, transform;
+}
+
+.banner-slide-item.active {
+    opacity: 1;
+    visibility: visible;
+    transform: scale(1.0);
+}
+
+.banner-slide-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+    display: block;
+}
+
 .overlay {
     position: absolute;
     inset: 0;
     width: 100%;
     height: 100%;
-}
-
-.banner-slideshow {
-    z-index: 0;
-}
-
-.banner-slideshow::before {
-    position: absolute;
-    inset: 0;
-    background: var(--first-banner-image) center / cover no-repeat;
-    content: "";
-}
-
-.banner-slide {
-    display: block;
-    object-fit: cover;
-    object-position: center;
-    opacity: 0;
-    transform: scale(1.03);
-    animation: bannerFade 30s ease-in-out infinite;
-}
-
-.banner-slide:first-child {
-    opacity: 1;
-}
-
-.overlay {
     background:
       linear-gradient(
         90deg,
-        rgba(0, 0, 0, 0.82) 0%,
-        rgba(0, 0, 0, 0.68) 36%,
-        rgba(0, 0, 0, 0.28) 64%,
-        rgba(0, 0, 0, 0) 100%
+        rgba(5, 10, 20, 0.88) 0%,
+        rgba(5, 10, 20, 0.72) 40%,
+        rgba(5, 10, 20, 0.35) 75%,
+        rgba(5, 10, 20, 0.15) 100%
       ),
       linear-gradient(
         180deg,
-        rgba(0, 0, 0, 0.24) 0%,
-        rgba(0, 0, 0, 0.08) 48%,
-        rgba(0, 0, 0, 0.3) 100%
-    );
+        rgba(5, 10, 20, 0.35) 0%,
+        rgba(5, 10, 20, 0.05) 50%,
+        rgba(5, 10, 20, 0.75) 100%
+      );
     z-index: 1;
-}
-
-@keyframes bannerFade {
-    0% {
-        opacity: 0;
-    }
-
-    3.33% {
-        opacity: 1;
-    }
-
-    16.67% {
-        opacity: 1;
-    }
-
-    20% {
-        opacity: 0;
-    }
-
-    100% {
-        opacity: 0;
-    }
+    pointer-events: none;
 }
 
 .hero-shell {
@@ -209,12 +196,14 @@ body {
     min-height: 100vh;
     display: flex;
     align-items: center;
+    justify-content: space-between;
     padding: 120px 64px 80px;
+    box-sizing: border-box;
 }
 
 .hero-content {
     color: white;
-    max-width: 620px;
+    max-width: 660px;
     display: flex;
     flex-direction: column;
     align-items: flex-start;
@@ -222,8 +211,50 @@ body {
     gap: 0;
 }
 
+.hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: rgba(0, 230, 118, 0.15);
+    border: 1px solid rgba(0, 230, 118, 0.35);
+    color: #00e676;
+    font-size: 0.82rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 22px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    transition: all 0.4s ease;
+}
+
+.hero-badge-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #00e676;
+    box-shadow: 0 0 10px #00e676;
+    animation: pulseGlow 2s infinite ease-in-out;
+}
+
+@keyframes pulseGlow {
+    0%, 100% {
+        transform: scale(0.9);
+        opacity: 0.7;
+    }
+    50% {
+        transform: scale(1.3);
+        opacity: 1;
+    }
+}
+
 #nav-green {
-  color: #00ff9d;
+    color: #00ff9d;
+    background: linear-gradient(135deg, #00ff9d, #00e676);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
 }
 
 .tag {
@@ -234,35 +265,138 @@ body {
 }
 
 .hero-content h1 {
-    font-size: clamp(2.35rem, 4.5vw, 3.35rem);
-    line-height: 1.1;
+    font-size: clamp(2.6rem, 5vw, 3.8rem);
+    line-height: 1.12;
+    font-weight: 800;
     margin: 0;
+    letter-spacing: -0.02em;
+    color: #ffffff;
+    text-shadow: 0 4px 20px rgba(0,0,0,0.4);
 }
 
 .description {
     margin-top: 24px;
-    font-size: 1rem;
+    font-size: 1.08rem;
     line-height: 1.8;
-    opacity: 0.9;
-    max-width: 560px;
+    color: rgba(240, 245, 255, 0.88);
+    max-width: 580px;
+    text-shadow: 0 2px 10px rgba(0,0,0,0.3);
+}
+
+.hero-actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-top: 36px;
+    flex-wrap: wrap;
 }
 
 .hero-btn {
-    margin-top: 32px;
-    padding: 10px 22px;
+    padding: 13px 28px;
     border: none;
-    background: white;
-    color: black;
-    font-size: 0.92rem;
+    font-size: 0.96rem;
+    font-weight: 600;
     cursor: pointer;
     border-radius: 30px;
-    transition: 0.3s;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
-.hero-btn:hover {
-    background: #00ff9d;
+.hero-btn.primary {
+    background: linear-gradient(135deg, #00ff9d 0%, #00e676 100%);
+    color: #041209;
+    box-shadow: 0 8px 24px rgba(0, 230, 118, 0.35);
 }
 
+.hero-btn.primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 30px rgba(0, 230, 118, 0.5);
+    background: linear-gradient(135deg, #24ffb0 0%, #00f07c 100%);
+}
+
+.hero-btn.secondary {
+    background: rgba(255, 255, 255, 0.08);
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+
+.hero-btn.secondary:hover {
+    background: rgba(255, 255, 255, 0.16);
+    border-color: rgba(0, 230, 118, 0.6);
+    color: #00ff9d;
+    transform: translateY(-2px);
+}
+
+.hero-indicators {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    z-index: 10;
+    align-self: center;
+}
+
+.hero-dot {
+    background: transparent;
+    border: none;
+    padding: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    outline: none;
+    transition: all 0.3s ease;
+}
+
+.hero-dot-bar {
+    width: 6px;
+    height: 24px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.25);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    display: block;
+}
+
+.hero-dot:hover .hero-dot-bar {
+    background: rgba(0, 230, 118, 0.6);
+    height: 32px;
+}
+
+.hero-dot.active .hero-dot-bar {
+    background: #00e676;
+    height: 48px;
+    box-shadow: 0 0 12px rgba(0, 230, 118, 0.8);
+}
+
+@media (max-width: 980px) {
+    .hero-indicators {
+        flex-direction: row;
+        position: absolute;
+        bottom: 30px;
+        left: 50%;
+        transform: translateX(-50%);
+    }
+
+    .hero-dot-bar {
+        width: 24px;
+        height: 6px;
+    }
+
+    .hero-dot:hover .hero-dot-bar {
+        width: 32px;
+        height: 6px;
+    }
+
+    .hero-dot.active .hero-dot-bar {
+        width: 48px;
+        height: 6px;
+    }
+}
+
+/* ================= HOME CONTENT SECTIONS ================= */
 .home-page {
   background: #050816;
   min-height: 100vh;
@@ -948,6 +1082,7 @@ body {
   }
 }
 
+/* ================= THEME ADAPTATIONS ================= */
 html[data-theme="bright"] body {
   background: #f7fff9;
   color: #10241b;
@@ -960,12 +1095,11 @@ html[data-theme="bright"] .home-sections {
 }
 
 html[data-theme="bright"] .hero-section {
-  background: #effaf2;
+  background: #060b14;
 }
 
-html[data-theme="bright"] .banner-slideshow::before,
-html[data-theme="bright"] .banner-slide {
-  filter: saturate(1.14) contrast(1.08) brightness(1.02);
+html[data-theme="bright"] .banner-slide-img {
+  filter: saturate(1.12) contrast(1.06) brightness(1.0);
 }
 
 html[data-theme="bright"] .navbar {
@@ -973,7 +1107,7 @@ html[data-theme="bright"] .navbar {
 }
 
 html[data-theme="bright"] .navbar.scrolled {
-  background: rgba(255, 255, 255, 0.78);
+  background: rgba(255, 255, 255, 0.85);
   border-bottom-color: rgba(39, 174, 96, 0.16);
   box-shadow: 0 10px 30px rgba(15, 23, 42, 0.1);
 }

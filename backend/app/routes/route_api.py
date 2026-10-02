@@ -1570,3 +1570,55 @@ def get_place_details():
     except requests.RequestException as error:
         print("API Error:", error)
         return jsonify({"error": "Unable to fetch place details"}), 502
+
+
+COMMUNITY_HAZARDS = [
+    {
+        "id": "hz-1",
+        "lat": 12.9716,
+        "lng": 77.5946,
+        "type": "pothole",
+        "severity": "medium",
+        "description": "Deep road depression on central lane",
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+    },
+    {
+        "id": "hz-2",
+        "lat": 12.9800,
+        "lng": 77.6000,
+        "type": "construction",
+        "severity": "high",
+        "description": "Metro construction lane barricade",
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+    },
+]
+
+
+@api.route("/hazards", methods=["GET"])
+def get_hazards():
+    return jsonify({"hazards": COMMUNITY_HAZARDS, "count": len(COMMUNITY_HAZARDS)}), 200
+
+
+@api.route("/hazards", methods=["POST"])
+def report_hazard():
+    data = request.get_json() or {}
+    lat = data.get("lat")
+    lng = data.get("lng")
+    h_type = data.get("type", "general")
+    severity = data.get("severity", "medium")
+    description = data.get("description", "Reported roadway hazard")
+
+    if lat is None or lng is None:
+        return jsonify({"error": "Latitude and Longitude are required"}), 400
+
+    new_hazard = {
+        "id": f"hz-{len(COMMUNITY_HAZARDS) + 1}",
+        "lat": float(lat),
+        "lng": float(lng),
+        "type": str(h_type),
+        "severity": str(severity),
+        "description": str(description),
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+    }
+    COMMUNITY_HAZARDS.append(new_hazard)
+    return jsonify({"success": True, "hazard": new_hazard}), 201

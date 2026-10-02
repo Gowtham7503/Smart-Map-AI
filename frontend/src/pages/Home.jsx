@@ -1,29 +1,58 @@
 import "./Home.css";
-import bannerImage1 from "../assets/banner-image1.jpg";
-import bannerImage2 from "../assets/banner-image2.jpg";
-import bannerImage3 from "../assets/banner-image3.jpg";
-import bannerImage4 from "../assets/banner-image4.jpg";
-import bannerImage5 from "../assets/banner-image5.jpg";
-import bannerImage6 from "../assets/banner-image6.jpg";
 import smartMapsLogoDark from "../assets/smartmaps_logo_dark.svg";
 import smartMapsLogo from "../assets/smartmaps_logo.svg";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import HomeSections from "../components/Home/HomeSections";
 
+// Premium High-Resolution Unsplash Images curated for Smart Navigation, Road Safety & Transit
 const bannerImages = [
-  bannerImage1,
-  bannerImage2,
-  bannerImage3,
-  bannerImage4,
-  bannerImage5,
-  bannerImage6,
+  {
+    url: "https://images.unsplash.com/photo-1519501025264-65ba15a82390?auto=format&fit=crop&w=2000&q=80",
+    tag: "Smart City Mobility",
+    caption: "Intelligent Urban Navigation",
+  },
+  {
+    url: "https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&w=2000&q=80",
+    tag: "Next-Gen GPS",
+    caption: "Real-Time Route Optimization",
+  },
+  {
+    url: "https://images.unsplash.com/photo-1506521781263-d8422e82f27a?auto=format&fit=crop&w=2000&q=80",
+    tag: "Safety-First Corridors",
+    caption: "Well-Lit & Secure Travel Routing",
+  },
+  {
+    url: "https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?auto=format&fit=crop&w=2000&q=80",
+    tag: "Scenic & Clean Routes",
+    caption: "Low-Emission Eco-Friendly Journeys",
+  },
+  {
+    url: "https://images.unsplash.com/photo-1517524008697-84bbe3c3fd98?auto=format&fit=crop&w=2000&q=80",
+    tag: "Smooth Highway Transit",
+    caption: "Seamless Highway & Mountain Routing",
+  },
+  {
+    url: "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=2000&q=80",
+    tag: "Urban Traffic Intelligence",
+    caption: "Live Dynamic Route Insights",
+  },
 ];
 
 const Home = ({ onToggleTheme, theme = "bright" }) => {
   const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState("home");
   const [scrolled, setScrolled] = useState(false);
+  const [currentSlide, setCurrentSlide] = useState(0);
+
+  // Smooth automatic slideshow cycling every 5 seconds
+  useEffect(() => {
+    const slideTimer = setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % bannerImages.length);
+    }, 5000);
+
+    return () => clearInterval(slideTimer);
+  }, []);
 
   useEffect(() => {
     const heroSection = document.querySelector(".hero-section");
@@ -79,7 +108,7 @@ const Home = ({ onToggleTheme, theme = "bright" }) => {
               type="button"
               aria-label={`Switch to ${theme === "dark" ? "bright" : "dark"} theme`}
             >
-              {theme === "dark" ? "bright" : "dark"}
+              {theme === "dark" ? "Bright" : "Dark"}
             </button>
           </li>
           <li>
@@ -101,25 +130,32 @@ const Home = ({ onToggleTheme, theme = "bright" }) => {
       </header>
 
       <main className="hero-section">
-        <div
-          className="banner-slideshow"
-          style={{ "--first-banner-image": `url(${bannerImages[0]})` }}
-          aria-hidden="true"
-        >
+        <div className="banner-slideshow" aria-hidden="true">
           {bannerImages.map((image, index) => (
-            <img
-              alt=""
-              className="banner-slide"
-              key={image}
-              src={image}
-              style={{ animationDelay: `${index * 5}s` }}
-            />
+            <div
+              className={`banner-slide-item ${index === currentSlide ? "active" : ""}`}
+              key={image.url}
+            >
+              <img
+                src={image.url}
+                alt={image.caption}
+                className="banner-slide-img"
+                loading={index === 0 ? "eager" : "lazy"}
+                decoding="async"
+                referrerPolicy="no-referrer"
+              />
+            </div>
           ))}
         </div>
         <div className="overlay"></div>
 
         <div className="hero-shell">
           <div className="hero-content">
+            <div className="hero-badge">
+              <span className="hero-badge-dot"></span>
+              <span>{bannerImages[currentSlide].tag}</span>
+            </div>
+
             <h1>
               Smart <span id="nav-green">Navigation</span>
               <br />
@@ -135,9 +171,29 @@ const Home = ({ onToggleTheme, theme = "bright" }) => {
               routes using AI, real-time traffic data, and pollution insights.
             </p>
 
-            <button className="hero-btn" onClick={() => navigate("/dashboard")}>
-              Explore Now
-            </button>
+            <div className="hero-actions">
+              <button className="hero-btn primary" onClick={() => navigate("/dashboard")}>
+                Explore Now
+              </button>
+              <a href="#features" className="hero-btn secondary">
+                Discover Features
+              </a>
+            </div>
+          </div>
+
+          <div className="hero-indicators" role="tablist" aria-label="Slideshow controls">
+            {bannerImages.map((image, index) => (
+              <button
+                key={image.url}
+                className={`hero-dot ${index === currentSlide ? "active" : ""}`}
+                onClick={() => setCurrentSlide(index)}
+                type="button"
+                aria-label={`Slide ${index + 1}: ${image.tag}`}
+                title={image.tag}
+              >
+                <span className="hero-dot-bar"></span>
+              </button>
+            ))}
           </div>
         </div>
       </main>
@@ -148,3 +204,4 @@ const Home = ({ onToggleTheme, theme = "bright" }) => {
 };
 
 export default Home;
+

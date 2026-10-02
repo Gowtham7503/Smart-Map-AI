@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: smartmap-backend
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn "app:create_app()" --workers 2 --bind 0.0.0.0:$PORT
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: MONGO_URI
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: ORS_API_KEY
+        sync: false
+      - key: WEATHER_API_KEY
+        sync: false
+      - key: UNSPLASH_API_KEY
+        sync: false
+      - key: TRAFFIC_API_KEY
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false

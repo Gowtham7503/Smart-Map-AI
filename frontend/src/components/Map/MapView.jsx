@@ -349,9 +349,9 @@ const MapView = ({ theme = "bright", onToggleTheme }) => {
   };
 
   const getCurrentLocation = () =>
-    new Promise((resolve, reject) => {
+    new Promise((resolve) => {
       if (!navigator.geolocation) {
-        reject(new Error("Geolocation is not supported in this browser."));
+        resolve(currentLocation || mapFocusPosition || [12.9716, 77.5946]);
         return;
       }
 
@@ -359,22 +359,33 @@ const MapView = ({ theme = "bright", onToggleTheme }) => {
         (pos) => {
           resolve([pos.coords.latitude, pos.coords.longitude]);
         },
-        () => reject(new Error("Unable to get your current location.")),
+        () => resolve(currentLocation || mapFocusPosition || [12.9716, 77.5946]),
+        { timeout: 4000 }
       );
     });
 
+  const cleanPlaceName = (name) => {
+    if (!name) return "";
+    let cleaned = name.trim();
+    if (cleaned.toLowerCase() === "my location" || cleaned.toLowerCase() === "current location") {
+      return "My Location";
+    }
+    cleaned = cleaned.replace(/\s+(?:safely|safest|safe|fastest|quickest|cleanest|by car|by bike|by walk|avoiding traffic|avoid traffic|with safety filter|with safe filter)\b.*$/i, "");
+    return cleaned.trim();
+  };
+
   const getPlaceDetails = async (place, includeGeometry = true) => {
-    const trimmedPlace = place.trim();
+    const trimmedPlace = cleanPlaceName(place);
 
     if (!trimmedPlace) {
       throw new Error("Please enter a location.");
     }
 
     if (trimmedPlace.toLowerCase() === "my location") {
-      const currentLocation = await getCurrentLocation();
+      const location = await getCurrentLocation();
 
       return {
-        coordinates: currentLocation,
+        coordinates: location,
         bounds: null,
         geojson: null,
         label: "My Location",
@@ -873,8 +884,8 @@ const MapView = ({ theme = "bright", onToggleTheme }) => {
   };
 
   const handleChatbotDirectionsIntent = (action) => {
-    const nextFrom = action.from?.trim();
-    const nextTo = action.to?.trim();
+    const nextFrom = cleanPlaceName(action.from?.trim() || "My Location");
+    const nextTo = cleanPlaceName(action.to?.trim());
     const nextMode = action.mode || mode;
     const nextFilters = {
       safest: Boolean(action.filters?.safest),
@@ -882,7 +893,7 @@ const MapView = ({ theme = "bright", onToggleTheme }) => {
       traffic: Boolean(action.filters?.traffic),
     };
 
-    if (!nextFrom || !nextTo) {
+    if (!nextTo) {
       return;
     }
 
@@ -901,6 +912,26 @@ const MapView = ({ theme = "bright", onToggleTheme }) => {
       to: nextTo,
       filters: nextFilters,
     });
+  };
+
+  const handleChatbotAction = (action) => {
+    if (!action) return;
+
+    if (action.type === "directions") {
+      handleChatbotDirectionsIntent(action);
+    } else if (action.type === "search_place" && action.query) {
+      runSearch(cleanPlaceName(action.query));
+    } else if (action.type === "toggle_filter" && action.filters) {
+      setFilters((prev) => {
+        const updated = { ...prev, ...action.filters };
+        if (from && to && routeCoords.length) {
+          fetchRoute(mode, false, { from, to, filters: updated });
+        }
+        return updated;
+      });
+    } else if (action.type === "start_navigation") {
+      handleStartNavigation();
+    }
   };
 
   const visibleRouteSummaries =
@@ -1090,7 +1121,7 @@ const MapView = ({ theme = "bright", onToggleTheme }) => {
             locationLabel="My Current Location"
             mapPosition={currentLocation || mapFocusPosition}
             onClose={() => setShowChatbot(false)}
-            onDirectionsIntent={handleChatbotDirectionsIntent}
+            onAction={handleChatbotAction}
             onMessagesChange={setChatbotMessages}
             onPlaceSelect={handleChatbotPlaceSelect}
           />
