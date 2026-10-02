@@ -9,6 +9,8 @@ import smtplib
 from flask import Blueprint, request, jsonify, session
 from werkzeug.security import generate_password_hash, check_password_hash
 from app.db import db
+from app.services.session_service import create_session, get_session_user, delete_session
+from app.services.user_service import serialize_user
 
 auth_bp = Blueprint("auth_api", __name__)
 otp_collection = db["otp_codes"]
@@ -78,6 +80,7 @@ def send_otp_email(email, otp):
         smtp.starttls()
         smtp.login(smtp_user, smtp_password)
         smtp.send_message(message)
+
 
 def validate_password_strength(password):
     """
@@ -203,6 +206,7 @@ def reset_password():
     session.pop("password_reset_verified_email", None)
     return jsonify({"message": "Password reset successfully"}), 200
 
+
 @auth_bp.route("/register", methods=["POST"])
 def register():
     data = request.get_json(silent=True) or {}
@@ -221,14 +225,30 @@ def register():
         return jsonify({"message": "User with this email already exists"}), 409
 
     hashed_password = generate_password_hash(password)
-    db.users.insert_one({
+    insert_result = db.users.insert_one({
         "firstName": first_name,
         "lastName": last_name,
         "email": email,
         "password": hashed_password
     })
 
-    return jsonify({"message": "User registered successfully"}), 201
+    user_record = db.users.find_one({"_id": insert_result.inserted_id})
+    token, _ = create_session(user_record)
+    session["user_email"] = email
+
+    return jsonify({
+        "message": "User registered successfully",
+        "token": token,
+        "user": serialize_user(user_record)
+    }), 201
+
+
+def extract_token_from_request():
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        return auth_header.split(" ", 1)[1].strip()
+    return request.headers.get("X-Auth-Token") or request.cookies.get("smartmaps_session")
+
 
 @auth_bp.route("/login", methods=["POST"])
 def login():
@@ -245,20 +265,39 @@ def login():
                 {"$set": {"password": generate_password_hash(password)}},
             )
         session["user_email"] = account_email
-        return jsonify({"message": "Login successful"}), 200
+        token, _ = create_session(user)
+        user_data = serialize_user(user)
+        return jsonify({
+            "message": "Login successful",
+            "token": token,
+            "user": user_data
+        }), 200
 
     return jsonify({"message": "Invalid email or password"}), 401
 
+
 @auth_bp.route("/me", methods=["GET"])
 def get_current_user():
-    email = session.get("user_email")
-    if not email:
-        return jsonify({"message": "Unauthorized"}), 401
+    token = extract_token_from_request()
+    if token:
+        user = get_session_user(token)
+        if user:
+            return jsonify({"user": user}), 200
 
-    user = db.users.find_one({"email": email}, {"password": 0, "_id": 0})
-    return jsonify({"user": user}), 200
+    email = session.get("user_email")
+    if email:
+        user = find_user_by_email(email)
+        if user:
+            return jsonify({"user": serialize_user(user)}), 200
+
+    return jsonify({"message": "Unauthorized"}), 401
+
 
 @auth_bp.route("/logout", methods=["POST"])
 def logout():
+    token = extract_token_from_request()
+    if token:
+        delete_session(token)
     session.pop("user_email", None)
     return jsonify({"message": "Logged out successfully"}), 200
+
