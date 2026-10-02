@@ -6,99 +6,114 @@ import re
 
 from flask import Blueprint, jsonify, request
 import requests
+from dotenv import load_dotenv
 
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
+load_dotenv(os.path.join(BASE_DIR, ".env"))
 
 chatbot_bp = Blueprint("chatbot", __name__)
 
 OVERPASS_API_URLS = (
-    "http://overpass-api.de/api/interpreter",
     "https://overpass-api.de/api/interpreter",
     "https://overpass.kumi.systems/api/interpreter",
+    "https://lz4.overpass-api.de/api/interpreter",
 )
-OVERPASS_TIMEOUT = (3, 30)
+OVERPASS_TIMEOUT = (3, 25)
 OVERPASS_HEADERS = {
     "Accept": "application/json",
     "User-Agent": "smartmap/1.0 (nearby place recommendations)",
 }
-DEFAULT_RADIUS_METERS = 2000
+DEFAULT_RADIUS_METERS = 3000
 MAX_RECOMMENDATIONS = 6
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_GEMINI_API_KEY")
-GEMINI_TIMEOUT = (3, 12)
+
+GEMINI_API_KEY = (
+    os.getenv("GEMINI_API_KEY")
+    or os.getenv("GOOGLE_GEMINI_API_KEY")
+    or ""
+).strip()
+
+GEMINI_MODELS = [
+    "gemini-3.5-flash-lite",
+    "gemini-3.1-flash-lite",
+    "gemini-flash-lite-latest",
+]
+GEMINI_TIMEOUT = (3, 10)
+
+SYSTEM_PROMPT = """You are SmartMaps AI - an intelligent navigation & city routing co-pilot.
+Your goal is to help users find routes, navigate safely, explore nearby places, and control the SmartMaps map interface.
+
+You MUST always return a valid JSON object matching this schema:
+{
+  "reply": "Friendly, helpful conversational response explaining what you did or answering the user's travel question.",
+  "action": <ActionObject or null>
+}
+
+SUPPORTED ACTIONS:
+1. "directions": Routing between locations with optional safety/eco/traffic preferences.
+   {
+     "type": "directions",
+     "from": "Origin City / Place (or 'My Location')",
+     "to": "Destination City / Place",
+     "mode": "car" | "bike" | "walk",
+     "filters": {
+       "safest": boolean,
+       "pollution": boolean,
+       "traffic": boolean
+     }
+   }
+   - If origin is not given or user says "go to X" / "navigate to X", use "from": "My Location".
+   - The 'from' and 'to' fields MUST ONLY contain the clean place name (e.g. "Delhi", NOT "Delhi safely").
+   - If user asks for "safely", "safe route", "safety", set "safest": true.
+   - If user asks for "eco", "clean route", "low pollution", set "pollution": true.
+   - If user asks for "fastest", "avoid traffic", "least traffic", set "traffic": true.
+   - Default mode is "car" unless user mentions bicycle/bike or walking/foot.
+
+2. "search_place": Search and focus map on a specific landmark, city, or address.
+   {
+     "type": "search_place",
+     "query": "Place Name"
+   }
+
+3. "toggle_filter": Toggle safety, pollution, or traffic optimization filters.
+   {
+     "type": "toggle_filter",
+     "filters": {
+       "safest": boolean,
+       "pollution": boolean,
+       "traffic": boolean
+     }
+   }
+
+4. "start_navigation": Start turn-by-turn GPS HUD navigation.
+   {
+     "type": "start_navigation"
+   }
+
+5. "nearby_places": Look up nearby points of interest around the current map area.
+   {
+     "type": "nearby_places",
+     "category": "restaurant" | "temple" | "cafe" | "museum" | "park" | "attraction"
+   }
+
+If the user is asking a general question, set action to null and provide a knowledgeable reply."""
 
 CATEGORY_KEYWORDS = {
-    "restaurant": (
-        "restaurant",
-        "restaurants",
-        "food",
-        "eat",
-        "dinner",
-        "lunch",
-        "breakfast",
-    ),
-    "temple": ("temple", "temples", "mandir", "worship", "religious"),
-    "cafe": ("cafe", "cafes", "coffee"),
-    "museum": ("museum", "museums"),
-    "park": ("park", "parks", "garden", "gardens"),
-    "attraction": (
-        "famous",
-        "attraction",
-        "attractions",
-        "landmark",
-        "landmarks",
-        "places",
-        "place",
-        "visit",
-        "sightseeing",
-        "tourist",
-    ),
+    "restaurant": ("restaurant", "restaurants", "food", "eat", "dinner", "lunch", "breakfast"),
+    "temple": ("temple", "temples", "mandir", "worship", "religious", "church", "mosque"),
+    "cafe": ("cafe", "cafes", "coffee", "tea"),
+    "museum": ("museum", "museums", "art gallery", "exhibition"),
+    "park": ("park", "parks", "garden", "gardens", "lake"),
+    "attraction": ("famous", "attraction", "attractions", "landmark", "landmarks", "places", "place", "visit", "sightseeing", "tourist"),
 }
 
 CATEGORY_LABELS = {
     "restaurant": "restaurants",
-    "temple": "temples",
+    "temple": "places of worship",
     "cafe": "cafes",
     "museum": "museums",
-    "park": "parks",
+    "park": "parks & gardens",
     "attraction": "famous places",
 }
-
-DIRECTION_KEYWORDS = {
-    "directions",
-    "direction",
-    "route",
-    "navigate",
-    "navigation",
-    "go",
-    "travel",
-    "drive",
-    "walk",
-    "bike",
-    "cycling",
-}
-
-MODE_KEYWORDS = {
-    "car": ("car", "drive", "driving", "cab", "taxi"),
-    "bike": ("bike", "bicycle", "cycle", "cycling"),
-    "walk": ("walk", "walking", "foot"),
-}
-
-FILTER_KEYWORDS = {
-    "safest": ("safe", "safest", "safety", "secure"),
-    "pollution": ("pollution", "clean", "cleanest", "air quality", "less polluted"),
-    "traffic": ("traffic", "jam", "congestion", "fastest", "less traffic"),
-}
-
-TRAILING_ROUTE_QUALIFIER_PATTERNS = (
-    r"\s+(?:with|using|use|apply|applying|enable|enabled|by)\s+.*\b(?:filter|filters|route|routing|traffic|pollution|safest|safety|safe|clean|cleanest|fastest)\b.*$",
-    r"\s+(?:and\s+)?(?:avoid|less|low|lowest|minimum|minimize)\s+.*\b(?:traffic|pollution|congestion)\b.*$",
-    r"\s+(?:and\s+)?(?:safe|safest|secure|fastest|clean|cleanest)\s+(?:route|routing|way)\b.*$",
-)
-
-LEADING_ROUTE_WORD_PATTERN = (
-    r"^(?:i\s+need\s+to\s+|i\s+want\s+to\s+|please\s+)?"
-    r"(?:go|goto|navigate|travel|drive|walk|bike|route|directions?)\s+"
-)
 
 
 def parse_number(value):
@@ -108,215 +123,213 @@ def parse_number(value):
         return None
 
 
-def detect_category(message):
-    normalized_message = re.sub(r"[^a-z0-9\s]", " ", message.lower())
-    words = set(normalized_message.split())
-
-    for category, keywords in CATEGORY_KEYWORDS.items():
-        if words.intersection(keywords):
-            return category
-
-    if words.intersection({"nearby", "recommend", "recommendation", "recommendations"}):
-        return "attraction"
-
-    return None
-
-
-def get_default_filters():
-    return {
-        "safest": False,
-        "pollution": False,
-        "traffic": False,
-    }
-
-
-def detect_mode(message):
-    normalized_message = message.lower()
-
-    for mode, keywords in MODE_KEYWORDS.items():
-        if any(keyword in normalized_message for keyword in keywords):
-            return mode
-
-    return None
-
-
-def detect_filters(message):
-    normalized_message = message.lower()
-    filters = get_default_filters()
-
-    for filter_name, keywords in FILTER_KEYWORDS.items():
-        if any(keyword in normalized_message for keyword in keywords):
-            filters[filter_name] = True
-
-    return filters
-
-
-def normalize_place_name(place):
-    if not place:
+def clean_place_string(val):
+    if not val:
         return ""
-
-    normalized_place = re.sub(r"\s+", " ", place).strip(" .,!?:;\"'")
-    normalized_place = re.sub(
-        LEADING_ROUTE_WORD_PATTERN,
-        "",
-        normalized_place,
-        flags=re.IGNORECASE,
-    ).strip(" .,!?:;\"'")
-
-    for pattern in TRAILING_ROUTE_QUALIFIER_PATTERNS:
-        normalized_place = re.sub(
-            pattern,
-            "",
-            normalized_place,
-            flags=re.IGNORECASE,
-        ).strip(" .,!?:;\"'")
-
-    if normalized_place.lower() in {"my location", "current location"}:
+    cleaned = str(val).strip(" .,!?:;\"'")
+    if cleaned.lower() in ("my location", "current location", "here"):
         return "My Location"
-
-    return normalized_place
-
-
-def parse_direction_intent_with_patterns(message):
-    normalized_message = re.sub(r"\s+", " ", message).strip()
-    direction_words = set(re.sub(r"[^a-z0-9\s]", " ", normalized_message.lower()).split())
-    has_direction_keyword = bool(direction_words.intersection(DIRECTION_KEYWORDS))
-
-    patterns = (
-        r"^(?:.*?\b)?from\s+(?P<from>.+?)\s+(?:to|towards?)\s+(?P<to>.+)$",
-        r"^(?:.*?\b)?between\s+(?P<from>.+?)\s+and\s+(?P<to>.+)$",
-        r"^(?:.*?\b)?(?:to|towards?)\s+(?P<to>.+?)\s+from\s+(?P<from>.+)$",
-        r"^(?:i\s+need\s+to\s+|i\s+want\s+to\s+|please\s+)?(?:go|goto|navigate|travel|drive|walk|bike)\s+(?:to\s+|towards\s+)?(?P<to>.+)$",
-        r"^(?P<from>.+?)\s+(?:to|towards?)\s+(?P<to>.+)$",
-    )
-
-    for index, pattern in enumerate(patterns):
-        match = re.search(pattern, normalized_message, flags=re.IGNORECASE)
-
-        if not match:
-            continue
-
-        is_simple_to_pattern = index == len(patterns) - 1
-
-        if is_simple_to_pattern and not has_direction_keyword:
-            category = detect_category(message)
-            if category is not None:
-                return None
-
-        origin = normalize_place_name(match.groupdict().get("from") or "My Location")
-        destination = normalize_place_name(match.groupdict().get("to"))
-
-        if origin and destination:
-            return {
-                "type": "directions",
-                "from": origin,
-                "to": destination,
-                "mode": detect_mode(message),
-                "filters": detect_filters(message),
-            }
-
-    return None
+    cleaned = re.sub(r"\s+(?:safely|safest|safe|fastest|quickest|cleanest|by car|by bike|by walk|avoiding traffic|avoid traffic)\b.*$", "", cleaned, flags=re.I)
+    return cleaned.strip(" .,!?:;\"'")
 
 
 def parse_json_object(text):
     if not text:
         return None
-
     cleaned_text = text.strip()
     fenced_match = re.search(
         r"```(?:json)?\s*(\{.*?\})\s*```",
         cleaned_text,
         flags=re.IGNORECASE | re.DOTALL,
     )
-
     if fenced_match:
         cleaned_text = fenced_match.group(1)
     else:
         object_match = re.search(r"\{.*\}", cleaned_text, flags=re.DOTALL)
         if object_match:
             cleaned_text = object_match.group(0)
-
     try:
         return json.loads(cleaned_text)
     except json.JSONDecodeError:
         return None
 
 
-def parse_direction_intent_with_gemini(message):
+def ask_gemini_flash_lite(message, history=None):
     if not GEMINI_API_KEY:
         return None
 
-    prompt = (
-        "Extract a map direction intent from this user message. "
-        "Return only JSON with this shape: "
-        '{"is_direction": boolean, "from": string|null, "to": string|null, '
-        '"mode": "car"|"bike"|"walk"|null, '
-        '"filters": {"safest": boolean, "pollution": boolean, "traffic": boolean}}. '
-        "Use null when a location is missing. Interpret 'my location' or "
-        "'current location' as 'My Location'. Enable filters only when the user asks "
-        "for safer, cleaner/low pollution, or lower-traffic/fastest routing. "
-        "The from and to values must contain only place names; do not include "
-        "words about route filters, traffic, pollution, safety, mode, or phrases "
-        "like 'with filter applied'. "
-        f"Message: {message}"
+    contents = []
+    if history and isinstance(history, list):
+        for item in history[-6:]:
+            role = "user" if item.get("sender") == "user" else "model"
+            text = item.get("text", "")
+            if text:
+                contents.append({"role": role, "parts": [{"text": text}]})
+
+    contents.append({"role": "user", "parts": [{"text": message}]})
+
+    payload = {
+        "systemInstruction": {"parts": [{"text": SYSTEM_PROMPT}]},
+        "contents": contents,
+        "generationConfig": {
+            "responseMimeType": "application/json",
+            "temperature": 0.2,
+        },
+    }
+
+    for model_name in GEMINI_MODELS:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent"
+        try:
+            res = requests.post(
+                url,
+                headers={"x-goog-api-key": GEMINI_API_KEY},
+                json=payload,
+                timeout=GEMINI_TIMEOUT,
+            )
+            if res.status_code == 200:
+                body = res.json()
+                parts = (
+                    body.get("candidates", [{}])[0]
+                    .get("content", {})
+                    .get("parts", [])
+                )
+                raw_text = "\n".join(p.get("text", "") for p in parts)
+                parsed = parse_json_object(raw_text)
+                if parsed and isinstance(parsed, dict) and "reply" in parsed:
+                    if parsed.get("action") and parsed["action"].get("type") == "directions":
+                        parsed["action"]["from"] = clean_place_string(parsed["action"].get("from", "My Location"))
+                        parsed["action"]["to"] = clean_place_string(parsed["action"].get("to", ""))
+                    return parsed
+        except requests.RequestException as e:
+            print(f"Gemini API request failed for {model_name}: {e}")
+            continue
+
+    return None
+
+
+def detect_category(message):
+    normalized = re.sub(r"[^a-z0-9\s]", " ", message.lower())
+    words = set(normalized.split())
+    for category, keywords in CATEGORY_KEYWORDS.items():
+        if words.intersection(keywords):
+            return category
+    if words.intersection({"nearby", "recommend", "recommendation", "recommendations"}):
+        return "attraction"
+    return None
+
+
+def fallback_rule_based_intent(message):
+    normalized = re.sub(r"\s+", " ", message).strip()
+    lower = normalized.lower()
+
+    # Routing intent
+    directions_match = re.search(
+        r"(?:from\s+(?P<from>.+?)\s+to\s+(?P<to>.+)|(?:go|travel|drive|navigate)\s+(?:from\s+(?P<from2>.+?)\s+)?to\s+(?P<to2>.+)|(?P<from3>[a-zA-Z\s]+)\s+to\s+(?P<to3>[a-zA-Z\s]+))",
+        normalized,
+        flags=re.IGNORECASE,
     )
-    endpoint = (
-        f"https://generativelanguage.googleapis.com/v1beta/models/"
-        f"{GEMINI_MODEL}:generateContent"
-    )
+    if directions_match:
+        d = directions_match.groupdict()
+        origin = d.get("from") or d.get("from2") or d.get("from3") or "My Location"
+        dest = d.get("to") or d.get("to2") or d.get("to3")
+        if dest:
+            dest = clean_place_string(dest)
+            origin = clean_place_string(origin)
+            mode = "bike" if "bike" in lower or "cycle" in lower else "walk" if "walk" in lower or "foot" in lower else "car"
+            safest = any(w in lower for w in ("safe", "safely", "safest", "security"))
+            pollution = any(w in lower for w in ("pollution", "eco", "clean", "cleanest"))
+            traffic = any(w in lower for w in ("traffic", "fastest", "quickest", "avoid traffic"))
+            return {
+                "reply": f"Finding a {'safest ' if safest else ''}route from {origin} to {dest} by {mode}.",
+                "action": {
+                    "type": "directions",
+                    "from": origin,
+                    "to": dest,
+                    "mode": mode,
+                    "filters": {
+                        "safest": safest,
+                        "pollution": pollution,
+                        "traffic": traffic,
+                    },
+                },
+            }
 
-    try:
-        response = requests.post(
-            endpoint,
-            headers={"x-goog-api-key": GEMINI_API_KEY},
-            json={"contents": [{"parts": [{"text": prompt}]}]},
-            timeout=GEMINI_TIMEOUT,
-        )
-        response.raise_for_status()
-    except requests.RequestException:
-        return None
-
-    parts = (
-        response.json()
-        .get("candidates", [{}])[0]
-        .get("content", {})
-        .get("parts", [])
-    )
-    gemini_text = "\n".join(part.get("text", "") for part in parts)
-    parsed_intent = parse_json_object(gemini_text)
-
-    if not parsed_intent or not parsed_intent.get("is_direction"):
-        return None
-
-    origin = normalize_place_name(parsed_intent.get("from"))
-    destination = normalize_place_name(parsed_intent.get("to"))
-
-    if not origin or not destination:
-        return None
-
-    filters = get_default_filters()
-    filters.update(
-        {
-            key: bool((parsed_intent.get("filters") or {}).get(key, filters[key]))
-            for key in filters
+    # Search intent
+    if lower.startswith(("search ", "find ", "locate ", "where is ")):
+        query = clean_place_string(re.sub(r"^(search|find|locate|where is)\s+(for\s+)?", "", normalized, flags=re.I))
+        return {
+            "reply": f"Searching for '{query}' on SmartMaps.",
+            "action": {"type": "search_place", "query": query},
         }
-    )
 
-    mode = parsed_intent.get("mode")
+    # Start navigation
+    if any(w in lower for w in ("start navigation", "start driving", "begin navigation", "start route")):
+        return {
+            "reply": "Starting GPS turn-by-turn navigation HUD now. Drive safely!",
+            "action": {"type": "start_navigation"},
+        }
+
+    # Nearby POIs
+    cat = detect_category(lower)
+    if cat:
+        return {
+            "reply": f"Finding nearby {CATEGORY_LABELS[cat]} around your current location.",
+            "action": {"type": "nearby_places", "category": cat},
+        }
+
     return {
-        "type": "directions",
-        "from": origin,
-        "to": destination,
-        "mode": mode if mode in MODE_KEYWORDS else detect_mode(message),
-        "filters": filters,
+        "reply": "I am your SmartMaps AI assistant. Ask me for directions (e.g. 'Hyderabad to Delhi safely'), to search any location, find nearby places, or toggle navigation!",
+        "action": None,
     }
 
 
-def detect_direction_intent(message):
-    return parse_direction_intent_with_patterns(message) or parse_direction_intent_with_gemini(message)
+def haversine_distance_km(latitude_a, longitude_a, latitude_b, longitude_b):
+    earth_radius_km = 6371
+    latitude_delta = radians(latitude_b - latitude_a)
+    longitude_delta = radians(longitude_b - longitude_a)
+    calculation = (
+        sin(latitude_delta / 2) ** 2
+        + cos(radians(latitude_a))
+        * cos(radians(latitude_b))
+        * sin(longitude_delta / 2) ** 2
+    )
+    return earth_radius_km * 2 * asin(sqrt(calculation))
 
 
-def get_category_query(category, latitude, longitude, radius):
+def get_element_coordinates(element):
+    if element.get("lat") is not None and element.get("lon") is not None:
+        return element["lat"], element["lon"]
+    center = element.get("center") or {}
+    return center.get("lat"), center.get("lon")
+
+
+def get_place_description(tags, category):
+    if tags.get("cuisine"):
+        cuisine = tags["cuisine"].replace(";", ", ").replace("_", " ")
+        return f"Cuisine: {cuisine}"
+    if tags.get("denomination"):
+        return tags["denomination"].replace("_", " ").title()
+    if tags.get("historic"):
+        return f"Historic {tags['historic'].replace('_', ' ')}"
+    if tags.get("tourism"):
+        return tags["tourism"].replace("_", " ").title()
+    if category == "park":
+        return "Park or garden"
+    return CATEGORY_LABELS.get(category, "Point of interest")[:-1].capitalize()
+
+
+def get_popularity_score(tags):
+    return (
+        (5 if tags.get("wikipedia") else 0)
+        + (4 if tags.get("wikidata") else 0)
+        + (2 if tags.get("website") else 0)
+        + (1 if tags.get("opening_hours") else 0)
+        + (1 if tags.get("image") else 0)
+    )
+
+
+@lru_cache(maxsize=256)
+def fetch_recommendations(category, latitude, longitude, radius):
     location = f"(around:{radius},{latitude},{longitude})"
     selectors = {
         "restaurant": [f'nwr{location}["amenity"="restaurant"]["name"];'],
@@ -336,62 +349,12 @@ def get_category_query(category, latitude, longitude, radius):
             f'nwr{location}["leisure"="park"]["name"];',
         ],
     }
-    return (
-        "[out:json][timeout:25];("
-        + "".join(selectors[category])
+    query = (
+        "[out:json][timeout:20];("
+        + "".join(selectors.get(category, selectors["attraction"]))
         + ");out center tags;"
     )
 
-
-def haversine_distance_km(latitude_a, longitude_a, latitude_b, longitude_b):
-    earth_radius_km = 6371
-    latitude_delta = radians(latitude_b - latitude_a)
-    longitude_delta = radians(longitude_b - longitude_a)
-    calculation = (
-        sin(latitude_delta / 2) ** 2
-        + cos(radians(latitude_a))
-        * cos(radians(latitude_b))
-        * sin(longitude_delta / 2) ** 2
-    )
-    return earth_radius_km * 2 * asin(sqrt(calculation))
-
-
-def get_element_coordinates(element):
-    if element.get("lat") is not None and element.get("lon") is not None:
-        return element["lat"], element["lon"]
-
-    center = element.get("center") or {}
-    return center.get("lat"), center.get("lon")
-
-
-def get_place_description(tags, category):
-    if tags.get("cuisine"):
-        cuisine = tags["cuisine"].replace(";", ", ").replace("_", " ")
-        return f"Cuisine: {cuisine}"
-    if tags.get("denomination"):
-        return tags["denomination"].replace("_", " ").title()
-    if tags.get("historic"):
-        return f"Historic {tags['historic'].replace('_', ' ')}"
-    if tags.get("tourism"):
-        return tags["tourism"].replace("_", " ").title()
-    if category == "park":
-        return "Park or garden"
-    return CATEGORY_LABELS[category][:-1].capitalize()
-
-
-def get_popularity_score(tags):
-    return (
-        (5 if tags.get("wikipedia") else 0)
-        + (4 if tags.get("wikidata") else 0)
-        + (2 if tags.get("website") else 0)
-        + (1 if tags.get("opening_hours") else 0)
-        + (1 if tags.get("image") else 0)
-    )
-
-
-@lru_cache(maxsize=256)
-def fetch_recommendations(category, latitude, longitude, radius):
-    query = get_category_query(category, latitude, longitude, radius)
     successful_response = None
     last_error = None
     session = requests.Session()
@@ -405,16 +368,14 @@ def fetch_recommendations(category, latitude, longitude, radius):
                 headers=OVERPASS_HEADERS,
                 timeout=OVERPASS_TIMEOUT,
             )
-            response.raise_for_status()
-            successful_response = response
-            break
+            if response.status_code == 200:
+                successful_response = response
+                break
         except requests.RequestException as error:
             last_error = error
 
     if successful_response is None:
-        raise last_error or requests.RequestException(
-            "No Overpass API endpoint was available."
-        )
+        return ()
 
     recommendations = []
     seen_names = set()
@@ -455,11 +416,7 @@ def fetch_recommendations(category, latitude, longitude, radius):
         key=lambda place: (-place["popularity_score"], place["distance_km"], place["name"])
     )
     return tuple(
-        {
-            key: value
-            for key, value in place.items()
-            if key != "popularity_score"
-        }
+        {key: value for key, value in place.items() if key != "popularity_score"}
         for place in recommendations[:MAX_RECOMMENDATIONS]
     )
 
@@ -470,89 +427,41 @@ def get_chatbot_recommendations():
     message = (data.get("message") or "").strip()
     latitude = parse_number(data.get("latitude"))
     longitude = parse_number(data.get("longitude"))
-    location_label = (data.get("location_label") or "the current map area").strip()
+    history = data.get("history", [])
 
     if not message:
         return jsonify({"error": "Please enter a message."}), 400
 
-    direction_intent = detect_direction_intent(message)
-    if direction_intent:
-        mode_label = direction_intent["mode"] or "car"
-        active_filters = [
-            label
-            for key, label in (
-                ("safest", "safest route"),
-                ("pollution", "low-pollution route"),
-                ("traffic", "lower-traffic route"),
-            )
-            if direction_intent["filters"].get(key)
-        ]
-        filter_label = ", ".join(active_filters) if active_filters else "standard route"
+    # 1. Ask Gemini Flash Lite with conversational context
+    result = ask_gemini_flash_lite(message, history)
 
-        return jsonify(
-            {
-                "reply": (
-                    f"Finding a {filter_label} by {mode_label} from "
-                    f"{direction_intent['from']} to {direction_intent['to']}."
-                ),
-                "action": direction_intent,
-                "recommendations": [],
-            }
-        )
+    # 2. Fallback if Gemini fails
+    if not result:
+        result = fallback_rule_based_intent(message)
 
-    category = detect_category(message)
-    if category is None:
-        return jsonify(
-            {
-                "reply": (
-                    "I can recommend nearby restaurants, temples, cafes, parks, "
-                    "museums, and famous places. Try asking \"famous places nearby\" "
-                    "or \"restaurants around here\"."
-                ),
-                "recommendations": [],
-            }
-        )
+    action = result.get("action")
+    recommendations = []
 
-    if latitude is None or longitude is None:
-        return jsonify(
-            {
-                "reply": "Search for a location on the map first, then ask me what is nearby.",
-                "recommendations": [],
-            }
-        )
+    # 3. If action is nearby POIs and we have coordinates, fetch real data
+    if action and action.get("type") == "nearby_places":
+        category = action.get("category", "attraction")
+        if latitude is not None and longitude is not None:
+            try:
+                recommendations = list(
+                    fetch_recommendations(
+                        category,
+                        round(latitude, 4),
+                        round(longitude, 4),
+                        DEFAULT_RADIUS_METERS,
+                    )
+                )
+            except Exception as e:
+                print("Error fetching nearby places:", e)
 
-    try:
-        recommendations = list(
-            fetch_recommendations(
-                category,
-                round(latitude, 4),
-                round(longitude, 4),
-                DEFAULT_RADIUS_METERS,
-            )
-        )
-    except requests.RequestException:
-        return jsonify(
-            {
-                "reply": (
-                    "I could not reach the nearby-places service just now. "
-                    "Please try again in a moment."
-                ),
-                "recommendations": [],
-                "service_available": False,
-            }
-        )
-
-    category_label = CATEGORY_LABELS[category]
-    reply = (
-        f"Here are some {category_label} near {location_label}. "
-        "Famous or well-documented places are shown first."
-        if recommendations
-        else f"I could not find named {category_label} near {location_label}."
-    )
     return jsonify(
         {
-            "reply": reply,
-            "category": category,
+            "reply": result.get("reply", "Here is what I found for you."),
+            "action": action,
             "recommendations": recommendations,
         }
     )
