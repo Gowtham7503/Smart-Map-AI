@@ -5,7 +5,7 @@ import {
   resetPassword,
   verifyPasswordResetOtp,
 } from "../services/api";
-import "./Otp.css";
+import "./otp.css";
 import LeftIllustration from "../assets/smart_access_illustration.svg";
 
 const passwordIsStrong = (password) =>
