@@ -1,9 +1,47 @@
 import axios from "axios";
 
+const AUTH_TOKEN_KEY = "smartmap:auth-token";
+
 const API = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || "/api",
   withCredentials: true,
 });
+
+const getAuthToken = () => localStorage.getItem(AUTH_TOKEN_KEY);
+
+const setAuthToken = (token) => {
+  if (token) {
+    localStorage.setItem(AUTH_TOKEN_KEY, token);
+  }
+};
+
+const clearAuthToken = () => {
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+};
+
+API.interceptors.request.use((config) => {
+  const token = getAuthToken();
+
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+
+  return config;
+});
+
+API.interceptors.response.use(
+  (response) => {
+    setAuthToken(response.data?.token);
+    return response;
+  },
+  (error) => {
+    if (error.response?.status === 401) {
+      clearAuthToken();
+    }
+
+    return Promise.reject(error);
+  },
+);
 
 export const getRoute = (coordinates, mode = "car", filters = {}) => {
   return API.post("/route", { coordinates, mode, filters });
@@ -64,6 +102,10 @@ export const getCurrentUser = () => {
   return API.get("/auth/me");
 };
 
-export const logoutUser = () => {
-  return API.post("/auth/logout");
+export const logoutUser = async () => {
+  try {
+    return await API.post("/auth/logout");
+  } finally {
+    clearAuthToken();
+  }
 };
