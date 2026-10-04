@@ -33,9 +33,12 @@ GEMINI_API_KEY = (
 ).strip()
 
 GEMINI_MODELS = [
-    "gemini-3.5-flash-lite",
-    "gemini-3.1-flash-lite",
-    "gemini-flash-lite-latest",
+    model.strip()
+    for model in os.getenv(
+        "GEMINI_MODELS",
+        "gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-2.5-flash-lite",
+    ).split(",")
+    if model.strip()
 ]
 GEMINI_TIMEOUT = (3, 10)
 
@@ -133,6 +136,13 @@ def clean_place_string(val):
     return cleaned.strip(" .,!?:;\"'")
 
 
+def format_place_name(place):
+    cleaned = clean_place_string(place)
+    if cleaned == "My Location" or not cleaned:
+        return cleaned
+    return " ".join(word.capitalize() for word in cleaned.split())
+
+
 def parse_json_object(text):
     if not text:
         return None
@@ -177,10 +187,13 @@ def ask_gemini_flash_lite(message, history=None):
         },
     }
 
+    session = requests.Session()
+    session.trust_env = False
+
     for model_name in GEMINI_MODELS:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent"
         try:
-            res = requests.post(
+            res = session.post(
                 url,
                 headers={"x-goog-api-key": GEMINI_API_KEY},
                 json=payload,
@@ -200,6 +213,11 @@ def ask_gemini_flash_lite(message, history=None):
                         parsed["action"]["from"] = clean_place_string(parsed["action"].get("from", "My Location"))
                         parsed["action"]["to"] = clean_place_string(parsed["action"].get("to", ""))
                     return parsed
+            print(
+                f"Gemini API returned {res.status_code} for {model_name}: "
+                f"{res.text[:300]}",
+                flush=True,
+            )
         except requests.RequestException as e:
             print(f"Gemini API request failed for {model_name}: {e}")
             continue
@@ -223,18 +241,30 @@ def fallback_rule_based_intent(message):
     lower = normalized.lower()
 
     # Routing intent
-    directions_match = re.search(
-        r"(?:from\s+(?P<from>.+?)\s+to\s+(?P<to>.+)|(?:go|travel|drive|navigate)\s+(?:from\s+(?P<from2>.+?)\s+)?to\s+(?P<to2>.+)|(?P<from3>[a-zA-Z\s]+)\s+to\s+(?P<to3>[a-zA-Z\s]+))",
-        normalized,
-        flags=re.IGNORECASE,
+    directions_match = (
+        re.search(
+            r"\bfrom\s+(?P<from>.+?)\s+\bto\s+(?P<to>.+)$",
+            normalized,
+            flags=re.IGNORECASE,
+        )
+        or re.search(
+            r"\b(?:go|travel|drive|navigate)\s+(?:from\s+(?P<from>.+?)\s+)?to\s+(?P<to>.+)$",
+            normalized,
+            flags=re.IGNORECASE,
+        )
+        or re.search(
+            r"^(?P<from>[a-zA-Z\s]+?)\s+\bto\s+(?P<to>[a-zA-Z\s]+)$",
+            normalized,
+            flags=re.IGNORECASE,
+        )
     )
     if directions_match:
         d = directions_match.groupdict()
-        origin = d.get("from") or d.get("from2") or d.get("from3") or "My Location"
-        dest = d.get("to") or d.get("to2") or d.get("to3")
+        origin = d.get("from") or "My Location"
+        dest = d.get("to")
         if dest:
-            dest = clean_place_string(dest)
-            origin = clean_place_string(origin)
+            dest = format_place_name(dest)
+            origin = format_place_name(origin)
             mode = "bike" if "bike" in lower or "cycle" in lower else "walk" if "walk" in lower or "foot" in lower else "car"
             safest = any(w in lower for w in ("safe", "safely", "safest", "security"))
             pollution = any(w in lower for w in ("pollution", "eco", "clean", "cleanest"))
