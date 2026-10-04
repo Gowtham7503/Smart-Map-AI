@@ -9,7 +9,12 @@ import smtplib
 from flask import Blueprint, request, jsonify, session
 from werkzeug.security import generate_password_hash, check_password_hash
 from app.db import db
-from app.services.session_service import create_session, get_session_user, delete_session
+from app.services.session_service import (
+    SESSION_COOKIE_NAME,
+    create_session,
+    get_session_user,
+    delete_session,
+)
 from app.services.user_service import serialize_user
 
 auth_bp = Blueprint("auth_api", __name__)
@@ -97,6 +102,19 @@ def validate_password_strength(password):
     if not re.search(r'[!@#$%^&*(),.?":{}|<>]', password):
         return False
     return True
+
+
+def set_session_cookie(response, token, expires_at):
+    response.set_cookie(
+        SESSION_COOKIE_NAME,
+        token,
+        expires=expires_at,
+        httponly=True,
+        secure=os.getenv("FLASK_ENV") == "production",
+        samesite="None" if os.getenv("FLASK_ENV") == "production" else "Lax",
+        path="/",
+    )
+    return response
 
 
 @auth_bp.route("/request-password-reset-otp", methods=["POST"])
@@ -233,14 +251,15 @@ def register():
     })
 
     user_record = db.users.find_one({"_id": insert_result.inserted_id})
-    token, _ = create_session(user_record)
+    token, expires_at = create_session(user_record)
     session["user_email"] = email
 
-    return jsonify({
+    response = jsonify({
         "message": "User registered successfully",
         "token": token,
         "user": serialize_user(user_record)
-    }), 201
+    })
+    return set_session_cookie(response, token, expires_at), 201
 
 
 def extract_token_from_request():
@@ -265,13 +284,14 @@ def login():
                 {"$set": {"password": generate_password_hash(password)}},
             )
         session["user_email"] = account_email
-        token, _ = create_session(user)
+        token, expires_at = create_session(user)
         user_data = serialize_user(user)
-        return jsonify({
+        response = jsonify({
             "message": "Login successful",
             "token": token,
             "user": user_data
-        }), 200
+        })
+        return set_session_cookie(response, token, expires_at), 200
 
     return jsonify({"message": "Invalid email or password"}), 401
 
@@ -299,5 +319,12 @@ def logout():
     if token:
         delete_session(token)
     session.pop("user_email", None)
-    return jsonify({"message": "Logged out successfully"}), 200
-
+    response = jsonify({"message": "Logged out successfully"})
+    response.delete_cookie(
+        SESSION_COOKIE_NAME,
+        path="/",
+        secure=os.getenv("FLASK_ENV") == "production",
+        httponly=True,
+        samesite="None" if os.getenv("FLASK_ENV") == "production" else "Lax",
+    )
+    return response, 200
