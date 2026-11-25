@@ -52,6 +52,14 @@ const MAP_STYLES = {
   },
 };
 
+const TERRAIN_LEGEND = [
+  { color: "#79a96b", label: "Green · vegetation / woodland" },
+  { color: "#d8c79f", label: "Tan · open plains / plateaus" },
+  { color: "#98745b", label: "Brown · contours / rugged slopes" },
+  { color: "#aeb4b8", label: "Gray / white · rocky hills / peaks" },
+  { color: "#438fbe", label: "Blue · water" },
+];
+
 const getAirQualityStyle = (aqi, standard) => {
   if (standard === "openweather") {
     const levels = {
@@ -282,6 +290,18 @@ const MapControls = ({
       </div>
 
       <div className="map-controls-bottom" style={{ bottom: bottomOffset + 12 }}>
+        {mapStyle === "terrain" && (
+          <aside className="terrain-map-legend" aria-label="Terrain map color guide">
+            <strong>Terrain colors</strong>
+            {TERRAIN_LEGEND.map(({ color, label }) => (
+              <div className="terrain-map-legend-row" key={label}>
+                <i style={{ backgroundColor: color }} aria-hidden="true" />
+                <span>{label}</span>
+              </div>
+            ))}
+            <p>Contours close together = steep; farther apart = gentler.</p>
+          </aside>
+        )}
         {hasSelectedPlace && (
           <button
             className="control-btn"

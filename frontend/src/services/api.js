@@ -44,7 +44,13 @@ API.interceptors.response.use(
 );
 
 export const getRoute = (coordinates, mode = "car", filters = {}) => {
-  return API.post("/route", { coordinates, mode, filters });
+  return API.post("/route", {
+    coordinates,
+    mode,
+    filters,
+    departure_epoch_ms: Date.now(),
+    timezone_offset_minutes: -new Date().getTimezoneOffset(),
+  });
 };
 
 export const getLowPollutionRoute = (coordinates, mode = "car", filters = {}) => {
