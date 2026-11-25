@@ -1,6 +1,6 @@
 from flask import Blueprint, Response, jsonify, request
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 import math
 import os
@@ -40,7 +40,9 @@ POI_RADIUS_METERS = 500
 ROUTE_SAMPLE_LIMIT = 5
 TRAFFIC_SAMPLE_INTERVAL_METERS = 1500
 TRAFFIC_SAMPLE_LIMIT = 40
+TRAFFIC_CORRIDOR_WIDTH_METERS = 500
 TRAFFIC_HOTSPOT_THRESHOLD = 0.03
+TRAVEL_DURATION_RISK_PER_HOUR = 0.05
 SCORING_WORKERS = 5
 EXTERNAL_API_TIMEOUT = (2, 4)
 OVERPASS_TIMEOUT = (2, 5)
@@ -55,6 +57,9 @@ def empty_traffic_details():
     return {
         "samples": [],
         "hotspots": [],
+        "road_closure_rate": 0,
+        "corridor_area_km2": 0,
+        "sampled_area_km2": 0,
     }
 
 
@@ -173,6 +178,76 @@ def get_time_safety_adjustment(hour, mode):
     return 0, "daytime"
 
 
+def get_departure_datetime(data):
+    epoch_ms = data.get("departure_epoch_ms")
+    offset_minutes = data.get("timezone_offset_minutes", 0)
+
+    try:
+        epoch_ms = float(epoch_ms)
+        offset_minutes = int(offset_minutes)
+    except (TypeError, ValueError):
+        return datetime.now()
+
+    if not -14 * 60 <= offset_minutes <= 14 * 60:
+        return datetime.now()
+
+    return datetime.fromtimestamp(epoch_ms / 1000, timezone.utc) + timedelta(
+        minutes=offset_minutes
+    )
+
+
+def get_trip_time_safety_adjustment(departure, duration_seconds, mode):
+    """Score time-of-day exposure plus cumulative risk from travel duration."""
+    try:
+        duration_seconds = float(duration_seconds)
+    except (TypeError, ValueError):
+        duration_seconds = 0
+
+    if duration_seconds <= 0:
+        penalty, band = get_time_safety_adjustment(departure.hour, mode)
+        return penalty, band, {
+            "duration_hours": 0,
+            "daytime_hours": 0,
+            "low_light_hours": 0,
+            "late_night_hours": 0,
+            "duration_penalty": 0,
+            "time_of_day_penalty": penalty,
+        }
+
+    elapsed_seconds = 0
+    weighted_penalty = 0
+    band_seconds = {"late_night": 0, "low_light": 0, "daytime": 0}
+
+    while elapsed_seconds < duration_seconds:
+        current_time = departure + timedelta(seconds=elapsed_seconds)
+        seconds_to_hour = 3600 - (current_time.minute * 60 + current_time.second)
+        step_seconds = min(seconds_to_hour, duration_seconds - elapsed_seconds)
+        midpoint = current_time + timedelta(seconds=step_seconds / 2)
+        penalty, band = get_time_safety_adjustment(midpoint.hour, mode)
+        weighted_penalty += penalty * step_seconds
+        band_seconds[band] += step_seconds
+        elapsed_seconds += step_seconds
+
+    duration_hours = duration_seconds / 3600
+    duration_penalty = duration_hours * TRAVEL_DURATION_RISK_PER_HOUR
+    # Keep extra night exposure increasing with trip length without letting
+    # one long trip make every time-of-day penalty immediately hit the cap.
+    time_of_day_penalty = (
+        weighted_penalty / duration_seconds * math.sqrt(duration_hours)
+    )
+    penalty = round(duration_penalty + time_of_day_penalty, 2)
+    time_band = max(band_seconds, key=band_seconds.get)
+    exposure = {
+        "duration_hours": round(duration_hours, 2),
+        "daytime_hours": round(band_seconds["daytime"] / 3600, 2),
+        "low_light_hours": round(band_seconds["low_light"] / 3600, 2),
+        "late_night_hours": round(band_seconds["late_night"] / 3600, 2),
+        "duration_penalty": round(duration_penalty, 2),
+        "time_of_day_penalty": round(time_of_day_penalty, 2),
+    }
+    return penalty, time_band, exposure
+
+
 def decode_polyline(encoded):
     coordinates = []
     index = 0
@@ -281,19 +356,21 @@ def sample_route_points_by_distance(
     if total_distance == 0:
         return [decoded_coordinates[0], decoded_coordinates[-1]]
 
-    target_count = min(
-        sample_limit,
-        max(2, math.floor(total_distance / interval_meters) + 1),
-    )
-    target_distances = [
-        min(total_distance, index * interval_meters)
-        for index in range(target_count)
-    ]
-
-    if target_distances[-1] < total_distance and len(target_distances) >= sample_limit:
-        target_distances[-1] = total_distance
-    elif target_distances[-1] < total_distance:
-        target_distances.append(total_distance)
+    regular_sample_count = max(2, math.floor(total_distance / interval_meters) + 1)
+    if regular_sample_count > sample_limit:
+        # Spread capped readings over the full route so long routes do not
+        # over-represent the first portion of the trip.
+        target_distances = [
+            index * total_distance / (sample_limit - 1)
+            for index in range(sample_limit)
+        ]
+    else:
+        target_distances = [
+            min(total_distance, index * interval_meters)
+            for index in range(regular_sample_count)
+        ]
+        if target_distances[-1] < total_distance:
+            target_distances.append(total_distance)
 
     samples = []
     segment_start_distance = 0
@@ -510,12 +587,37 @@ def get_route_traffic_score(route, mode):
     if not congestion_values and road_closures == 0:
         return None, 0, None, empty_traffic_details()
 
-    avg_congestion = round(sum(congestion_values) / len(congestion_values), 2) if congestion_values else 0
+    evaluated_samples = len(traffic_sample_details)
+    route_distance_meters = (
+        (route.get("summary") or {}).get("distance")
+        or get_route_geometry_distance_meters(route)
+    )
+    corridor_area_km2 = (
+        route_distance_meters * TRAFFIC_CORRIDOR_WIDTH_METERS / 1_000_000
+    )
+    sample_area_km2 = corridor_area_km2 / len(sampled_points) if sampled_points else 0
+    sampled_area_km2 = sample_area_km2 * evaluated_samples
+    congestion_sampled_area_km2 = sample_area_km2 * len(congestion_values)
+
+    # Each evenly spaced reading represents an equal area of a 500 m wide
+    # corridor. Dividing the weighted exposure by observed area keeps this a
+    # traffic-density score rather than a total that grows with route length.
+    congestion_exposure = sum(congestion_values) * sample_area_km2
+    avg_congestion = (
+        round(congestion_exposure / congestion_sampled_area_km2, 2)
+        if congestion_sampled_area_km2
+        else 0
+    )
+    road_closure_rate = (
+        round((road_closures * sample_area_km2) / sampled_area_km2, 3)
+        if sampled_area_km2
+        else 0
+    )
 
     if mode == "car":
-        traffic_penalty = round(avg_congestion * 1.2 + road_closures * 1.5, 2)
+        traffic_penalty = round(avg_congestion * 1.2 + road_closure_rate * 1.5, 2)
     else:
-        traffic_penalty = round(avg_congestion * 0.5 + road_closures * 1.0, 2)
+        traffic_penalty = round(avg_congestion * 0.5 + road_closure_rate * 1.0, 2)
 
     return (
         avg_congestion,
@@ -524,6 +626,11 @@ def get_route_traffic_score(route, mode):
         {
             "samples": traffic_sample_details,
             "hotspots": traffic_hotspots,
+            "road_closure_rate": road_closure_rate,
+            "corridor_area_km2": round(corridor_area_km2, 3),
+            "sampled_area_km2": round(sampled_area_km2, 3),
+            "congestion_sampled_area_km2": round(congestion_sampled_area_km2, 3),
+            "corridor_width_meters": TRAFFIC_CORRIDOR_WIDTH_METERS,
         },
     )
 
@@ -541,6 +648,9 @@ def score_route_for_traffic(route, mode):
         "traffic_congestion": traffic_congestion,
         "traffic_penalty": traffic_penalty,
         "road_closures": road_closures,
+        "road_closure_rate": traffic_details.get("road_closure_rate", 0),
+        "corridor_area_km2": traffic_details.get("corridor_area_km2", 0),
+        "sampled_area_km2": traffic_details.get("sampled_area_km2", 0),
         "traffic_samples": traffic_details.get("samples", []),
         "traffic_hotspots": traffic_details.get("hotspots", []),
         "evaluated_hour": datetime.now().hour,
@@ -968,6 +1078,18 @@ def get_route_traffic_sample_points(route):
     return sample_route_points_by_distance(decoded_coordinates)
 
 
+def get_route_geometry_distance_meters(route):
+    try:
+        coordinates = decode_polyline(route.get("geometry"))
+    except (TypeError, ValueError, IndexError):
+        return 0
+
+    return sum(
+        get_distance_meters(coordinates[index - 1], coordinates[index])
+        for index in range(1, len(coordinates))
+    )
+
+
 def build_route_request_body(coordinates, include_alternatives=False, shortest_route=False):
     request_body = {
         "coordinates": coordinates,
@@ -989,7 +1111,7 @@ def build_route_request_body(coordinates, include_alternatives=False, shortest_r
 
 def fetch_openrouteservice_route(profile, ors_api_key, request_body):
     response = requests.post(
-        f"https://api.openrouteservice.org/v2/directions/{profile}",
+        f"https://api.heigit.org/openrouteservice/v2/directions/{profile}",
         json=request_body,
         headers={
             "Authorization": ors_api_key,
@@ -1011,11 +1133,19 @@ def get_request_error_details(error):
         return error.response.text
 
 
-def score_route_for_safety(route, mode, current_hour):
+def score_route_for_safety(route, mode, departure_time):
     route_extras = route.get("extras") or route.get("extra_info") or {}
     waytype_summary = route_extras.get("waytype", {}).get("summary", [])
     base_safety_score = calculate_waytype_safety_score(waytype_summary)
-    time_penalty, time_band = get_time_safety_adjustment(current_hour, mode)
+    try:
+        duration_seconds = float((route.get("summary") or {}).get("duration", 0))
+    except (TypeError, ValueError):
+        duration_seconds = 0
+    time_penalty, time_band, time_exposure = get_trip_time_safety_adjustment(
+        departure_time,
+        duration_seconds,
+        mode,
+    )
     sampled_points = get_route_sample_points(route)
     normalized_points = normalize_sampled_points(sampled_points)
 
@@ -1056,9 +1186,12 @@ def score_route_for_safety(route, mode, current_hour):
         "traffic_congestion": traffic_congestion,
         "traffic_penalty": traffic_penalty,
         "road_closures": road_closures,
+        "road_closure_rate": traffic_details.get("road_closure_rate", 0),
+        "corridor_area_km2": traffic_details.get("corridor_area_km2", 0),
+        "sampled_area_km2": traffic_details.get("sampled_area_km2", 0),
         "traffic_samples": traffic_details.get("samples", []),
         "traffic_hotspots": traffic_details.get("hotspots", []),
-        "evaluated_hour": current_hour,
+        "evaluated_hour": departure_time.hour,
         "mode": mode,
     }
     route["safety_context"] = {
@@ -1072,10 +1205,15 @@ def score_route_for_safety(route, mode, current_hour):
         "traffic_congestion": traffic_congestion,
         "traffic_penalty": traffic_penalty,
         "road_closures": road_closures,
+        "road_closure_rate": traffic_details.get("road_closure_rate", 0),
+        "corridor_area_km2": traffic_details.get("corridor_area_km2", 0),
+        "sampled_area_km2": traffic_details.get("sampled_area_km2", 0),
         "traffic_samples": traffic_details.get("samples", []),
         "traffic_hotspots": traffic_details.get("hotspots", []),
         "time_band": time_band,
-        "evaluated_hour": current_hour,
+        "time_exposure": time_exposure,
+        "estimated_duration_hours": round((duration_seconds or 0) / 3600, 2),
+        "evaluated_hour": departure_time.hour,
     }
 
     for segment in route.get("segments", []):
@@ -1142,7 +1280,7 @@ def get_route():
 
         try:
             response = requests.post(
-                f"https://api.openrouteservice.org/v2/directions/{profile}",
+                f"https://api.heigit.org/openrouteservice/v2/directions/{profile}",
                 json=fallback_body,
                 headers={
                     "Authorization": ors_api_key,
@@ -1194,18 +1332,23 @@ def get_route():
         )
 
     if is_safe:
-        current_hour = datetime.now().hour
+        departure_time = get_departure_datetime(data)
         routes = route_data.get("routes", [])
 
         score_routes_in_parallel(
             routes,
-            lambda route: score_route_for_safety(route, mode, current_hour),
+            lambda route: score_route_for_safety(route, mode, departure_time),
         )
 
         for index, route in enumerate(routes):
             route["route_rank"] = index + 1
 
-        routes.sort(key=lambda route: route.get("safety_score", 6))
+        routes.sort(
+            key=lambda route: (
+                route.get("safety_score", 6),
+                (route.get("summary") or {}).get("duration", float("inf")),
+            )
+        )
 
         for index, route in enumerate(routes):
             route["selected_for_safety"] = index == 0

@@ -405,11 +405,16 @@ html[data-theme="dark"] .route-summary-note {
 }
 
 html[data-theme="dark"] .route-map-legend,
-html[data-theme="dark"] .traffic-map-legend {
+html[data-theme="dark"] .traffic-map-legend,
+html[data-theme="dark"] .terrain-map-legend {
   border-color: var(--theme-border);
   background: rgba(17, 28, 45, 0.96);
   box-shadow: 0 8px 22px rgba(0, 0, 0, 0.38);
   color: var(--theme-text);
+}
+
+html[data-theme="dark"] .terrain-map-legend p {
+  color: #cbd5e1;
 }
 
 html[data-theme="dark"] .route-map-legend-line {
@@ -527,6 +532,45 @@ html[data-theme="dark"] .route-map-legend-line.secondary {
   color: #0f172a;
   font-size: 12px;
   font-weight: 600;
+}
+
+.terrain-map-legend {
+  display: grid;
+  gap: 5px;
+  width: 220px;
+  padding: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.16);
+  color: #0f172a;
+  font-size: 11px;
+}
+
+.terrain-map-legend > strong {
+  font-size: 12px;
+}
+
+.terrain-map-legend-row {
+  display: grid;
+  grid-template-columns: 13px 1fr;
+  align-items: start;
+  gap: 6px;
+  line-height: 1.25;
+}
+
+.terrain-map-legend-row i {
+  width: 12px;
+  height: 12px;
+  margin-top: 1px;
+  border: 1px solid rgba(15, 23, 42, 0.22);
+  border-radius: 3px;
+}
+
+.terrain-map-legend p {
+  margin: 1px 0 0;
+  color: #475569;
+  line-height: 1.25;
 }
 
 .route-map-legend span {
@@ -1198,6 +1242,7 @@ html[data-theme="dark"] .search-box:focus-within {
   bottom: 86px;
   display: flex;
   flex-direction: column;
+  align-items: flex-end;
   gap: 8px;
   z-index: 1000;
 }
